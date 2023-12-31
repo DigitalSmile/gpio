@@ -1,0 +1,86 @@
+package org.ds.io.gpio.model;
+
+import org.ds.io.core.NativeMemoryAccess;
+
+import java.lang.foreign.*;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.VarHandle;
+import java.util.Arrays;
+
+/**
+ * @param lineOffsets   64
+ * @param defaultValues 64
+ * @param consumerLabel 32
+ */
+public record GPIOHandleRequest(int[] lineOffsets, int flags, byte[] defaultValues, byte[] consumerLabel, int lines,
+                                int fd) implements NativeMemoryAccess {
+
+    private static final MemoryLayout LAYOUT = MemoryLayout.structLayout(
+            MemoryLayout.sequenceLayout(64, ValueLayout.JAVA_INT).withName("lineOffsets"),
+            ValueLayout.JAVA_INT.withName("flags"),
+            MemoryLayout.sequenceLayout(64, ValueLayout.JAVA_BYTE).withName("defaultValues"),
+            MemoryLayout.sequenceLayout(32, ValueLayout.JAVA_BYTE).withName("consumerLabel"),
+            ValueLayout.JAVA_INT.withName("lines"),
+            ValueLayout.JAVA_INT.withName("fd")
+    );
+
+    private static final MethodHandle MH_LINE_OFFSETS = LAYOUT.sliceHandle(MemoryLayout.PathElement.groupElement("lineOffsets"));
+    private static final VarHandle VH_FLAGS = LAYOUT.varHandle(MemoryLayout.PathElement.groupElement("flags"));
+    private static final MethodHandle MH_DEFAULT_VALUES = LAYOUT.sliceHandle(MemoryLayout.PathElement.groupElement("defaultValues"));
+    private static final MethodHandle MH_CONSUMER_LABEL = LAYOUT.sliceHandle(MemoryLayout.PathElement.groupElement("consumerLabel"));
+    private static final VarHandle VH_LINES = LAYOUT.varHandle(MemoryLayout.PathElement.groupElement("lines"));
+    private static final VarHandle VH_FD = LAYOUT.varHandle(MemoryLayout.PathElement.groupElement("fd"));
+
+
+    @Override
+    public MemoryLayout getMemoryLayout() {
+        return LAYOUT;
+    }
+
+    private static MemorySegment invokeExact(MethodHandle handle, MemorySegment buffer) throws Throwable {
+        return ((MemorySegment) handle.invokeExact(buffer));
+    }
+
+    @Override
+    public GPIOHandleRequest fromBytes(MemorySegment buffer) throws Throwable {
+        return new GPIOHandleRequest(
+                invokeExact(MH_LINE_OFFSETS, buffer).toArray(ValueLayout.JAVA_INT),
+                (int) VH_FLAGS.get(buffer),
+                invokeExact(MH_DEFAULT_VALUES, buffer).toArray(ValueLayout.JAVA_BYTE),
+                invokeExact(MH_CONSUMER_LABEL, buffer).toArray(ValueLayout.JAVA_BYTE),
+                (int) VH_LINES.get(buffer),
+                (int) VH_FD.get(buffer)
+        );
+    }
+
+    @Override
+    public void toBytes(MemorySegment buffer) throws Throwable {
+        var tmp = invokeExact(MH_LINE_OFFSETS, buffer);
+        for (int i = 0; i < lineOffsets.length; i++) {
+            tmp.setAtIndex(ValueLayout.JAVA_INT, i, lineOffsets[i]);
+        }
+        VH_FLAGS.set(buffer, flags);
+        tmp = invokeExact(MH_DEFAULT_VALUES, buffer);
+        for (int i = 0; i < defaultValues.length; i++) {
+            tmp.setAtIndex(ValueLayout.JAVA_BYTE, i, defaultValues[i]);
+        }
+        tmp = invokeExact(MH_CONSUMER_LABEL, buffer);
+        for (int i = 0; i < consumerLabel.length; i++) {
+            tmp.setAtIndex(ValueLayout.JAVA_BYTE, i, consumerLabel[i]);
+        }
+        VH_LINES.set(buffer, lines);
+        VH_FD.set(buffer, fd);
+    }
+
+    @Override
+    public String toString() {
+        return "GPIOHandleRequest{" +
+                "lineOffsets=" + Arrays.toString(lineOffsets) +
+                ", flags=" + flags +
+                ", defaultValues=" + new String(defaultValues) +
+                ", consumerLabel=" + new String(consumerLabel) +
+                ", lines=" + lines +
+                ", fd=" + fd +
+                '}';
+    }
+}
