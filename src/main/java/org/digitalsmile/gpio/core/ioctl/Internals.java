@@ -1,5 +1,8 @@
 package org.digitalsmile.gpio.core.ioctl;
 
+/**
+ * Internal reference file from Kernel headers to calculate ioctl commands.
+ */
 final class Internals {
     static final long SPI_IOC_RD_MODE;
     static final long SPI_IOC_WR_MODE;

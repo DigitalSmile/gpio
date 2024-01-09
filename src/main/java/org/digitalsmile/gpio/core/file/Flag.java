@@ -1,6 +1,9 @@
 package org.digitalsmile.gpio.core.file;
 
-public final class Flags {
+/**
+ * Kernel flags for open command.
+ */
+public final class Flag {
 
     public static final int O_APPEND = 1024;
     public static final int O_ASYNC = 8192;

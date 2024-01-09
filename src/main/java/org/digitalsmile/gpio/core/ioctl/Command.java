@@ -1,6 +1,15 @@
 package org.digitalsmile.gpio.core.ioctl;
 
+/**
+ * Commands to be provided for ioctl calls.
+ */
 public final class Command {
+
+    /**
+     * Forbids creating an instance of this class.
+     */
+    private Command() {
+    }
 
     public static long getGpioGetChipInfoIoctl() {
         return Internals.GPIO_GET_CHIPINFO_IOCTL;

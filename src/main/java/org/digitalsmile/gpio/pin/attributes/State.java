@@ -1,14 +1,36 @@
 package org.digitalsmile.gpio.pin.attributes;
 
+/**
+ * GPIO Pin state, representing if it is HIGH (1) or LOW (0).
+ */
 public enum State {
-    HIGH((byte) 1), LOW((byte) 0);
+    /**
+     * Represents electrical 1 on the Pin
+     */
+    HIGH(1),
+    /**
+     * Represents electrical 0 of the Pin
+     */
+    LOW(0);
 
-    private final byte state;
-    State(byte state) {
-        this.state = state;
+    private final int value;
+
+    /**
+     * Constructs the State from given integer value.
+     *
+     * @param state - integer value of the State
+     */
+    State(int state) {
+        this.value = state;
     }
 
-    public byte getState() {
-        return state;
+    /**
+     * Gets the byte value of State.
+     * Please note, that byte and integer are identical types in java, so it is safe to cast from one to another.
+     *
+     * @return the byte value of state
+     */
+    public byte getValue() {
+        return (byte) value;
     }
 }

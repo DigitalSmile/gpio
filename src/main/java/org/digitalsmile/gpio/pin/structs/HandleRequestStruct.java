@@ -7,9 +7,20 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.util.Arrays;
 
+/**
+ * Structure the represents GPIO data to send with ioctl.
+ *
+ * @param lineOffsets   - line offset
+ * @param flags         - flags
+ * @param defaultValues - default values
+ * @param consumerLabel - consumer labels
+ * @param lines         - lines
+ * @param fd            - file descriptor
+ */
 public record HandleRequestStruct(int[] lineOffsets, int flags, byte[] defaultValues, byte[] consumerLabel, int lines,
                                   int fd) implements NativeMemoryLayout {
 
+    // see https://elixir.bootlin.com/linux/v6.7/source/include/uapi/linux/gpio.h#L412
     private static final MemoryLayout LAYOUT = MemoryLayout.structLayout(
             MemoryLayout.sequenceLayout(64, ValueLayout.JAVA_INT).withName("lineOffsets"),
             ValueLayout.JAVA_INT.withName("flags"),
@@ -32,10 +43,11 @@ public record HandleRequestStruct(int[] lineOffsets, int flags, byte[] defaultVa
         return LAYOUT;
     }
 
-     static MemorySegment invokeExact(MethodHandle handle, MemorySegment buffer) throws Throwable {
-        return ((MemorySegment) handle.invokeExact(buffer));
+    private static MemorySegment invokeExact(MethodHandle handle, MemorySegment buffer) throws Throwable {
+        return (MemorySegment) handle.invokeExact(buffer);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public HandleRequestStruct fromBytes(MemorySegment buffer) throws Throwable {
         return new HandleRequestStruct(

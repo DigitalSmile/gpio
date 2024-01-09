@@ -1,3 +1,6 @@
+/**
+ * Main GPIO module
+ */
 module gpio.main {
     requires org.slf4j;
 
@@ -5,5 +8,6 @@ module gpio.main {
     exports org.digitalsmile.gpio.pin;
     exports org.digitalsmile.gpio.pin.attributes;
     exports org.digitalsmile.gpio.spi;
+    exports org.digitalsmile.gpio.pin.event;
     exports org.digitalsmile.gpio;
 }

@@ -1,5 +1,8 @@
 package org.digitalsmile.gpio.pin.attributes;
 
+/**
+ * GPIO Flags that can return from ioctl.
+ */
 public enum Flag {
     KERNEL(1),  // 1
     IS_OUT(1 << 1), // 2
@@ -12,10 +15,21 @@ public enum Flag {
 
 
     private final int value;
+
+    /**
+     * Constructs Flag from given integer value.
+     *
+     * @param value - given integer value
+     */
     Flag(int value) {
         this.value = value;
     }
 
+    /**
+     * Gets the integer value from the Flag.
+     *
+     * @return integer value of the Flag
+     */
     public int getValue() {
         return value;
     }

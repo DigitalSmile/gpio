@@ -8,7 +8,15 @@ import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 
+/**
+ * Structure the represents GPIO data to send with ioctl.
+ *
+ * @param name  - name
+ * @param label - label
+ * @param lines - lines
+ */
 public record InfoStruct(byte[] name, byte[] label, int lines) implements NativeMemoryLayout {
+    // see https://elixir.bootlin.com/linux/v6.7/source/include/uapi/linux/gpio.h#L32
     private static final MemoryLayout LAYOUT = MemoryLayout.structLayout(
             MemoryLayout.sequenceLayout(32, ValueLayout.JAVA_BYTE).withName("name"),
             MemoryLayout.sequenceLayout(32, ValueLayout.JAVA_BYTE).withName("label"),

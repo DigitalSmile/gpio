@@ -8,7 +8,16 @@ import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 
+/**
+ * Structure the represents GPIO data to send with ioctl.
+ *
+ * @param offset   - offset
+ * @param flags    - flags
+ * @param name     - name
+ * @param consumer - consumer
+ */
 public record LineInfoStruct(int offset, int flags, byte[] name, byte[] consumer) implements NativeMemoryLayout {
+    //see https://elixir.bootlin.com/linux/v6.7/source/include/uapi/linux/gpio.h#L335
     private final static MemoryLayout LAYOUT = MemoryLayout.structLayout(
             ValueLayout.JAVA_INT.withName("offset"),
             ValueLayout.JAVA_INT.withName("flags"),

@@ -7,7 +7,13 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.util.Arrays;
 
+/**
+ * Structure the represents GPIO data to send with ioctl.
+ *
+ * @param values - data to send through GPIO
+ */
 public record HandleDataStruct(byte[] values) implements NativeMemoryLayout {
+    // see https://elixir.bootlin.com/linux/v6.7/source/include/uapi/linux/gpio.h#L449
     private static final MemoryLayout LAYOUT = MemoryLayout.sequenceLayout(64, ValueLayout.JAVA_BYTE);
 
     @Override
