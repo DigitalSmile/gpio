@@ -1,6 +1,6 @@
-package org.ds.io.core;
+package org.digitalsmile.gpio.core.file;
 
-public class IOFlags {
+public final class Flags {
 
     public static final int O_APPEND = 1024;
     public static final int O_ASYNC = 8192;

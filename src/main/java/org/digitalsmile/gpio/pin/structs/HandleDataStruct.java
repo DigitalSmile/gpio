@@ -1,13 +1,13 @@
-package org.ds.io.gpio.model;
+package org.digitalsmile.gpio.pin.structs;
 
-import org.ds.io.core.NativeMemoryAccess;
+import org.digitalsmile.gpio.core.NativeMemoryLayout;
 
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.util.Arrays;
 
-public record GPIOHandleData(byte[] values) implements NativeMemoryAccess {
+public record HandleDataStruct(byte[] values) implements NativeMemoryLayout {
     private static final MemoryLayout LAYOUT = MemoryLayout.sequenceLayout(64, ValueLayout.JAVA_BYTE);
 
     @Override
@@ -15,9 +15,10 @@ public record GPIOHandleData(byte[] values) implements NativeMemoryAccess {
         return LAYOUT;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public GPIOHandleData fromBytes(MemorySegment buffer) throws Throwable {
-        return new GPIOHandleData(buffer.toArray(ValueLayout.JAVA_BYTE));
+    public HandleDataStruct fromBytes(MemorySegment buffer) throws Throwable {
+        return new HandleDataStruct(buffer.toArray(ValueLayout.JAVA_BYTE));
     }
 
     @Override

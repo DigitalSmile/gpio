@@ -1,19 +1,14 @@
-package org.ds.io.gpio.model;
+package org.digitalsmile.gpio.pin.structs;
 
-import org.ds.io.core.NativeMemoryAccess;
+import org.digitalsmile.gpio.core.NativeMemoryLayout;
 
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.util.Arrays;
 
-/**
- * @param lineOffsets   64
- * @param defaultValues 64
- * @param consumerLabel 32
- */
-public record GPIOHandleRequest(int[] lineOffsets, int flags, byte[] defaultValues, byte[] consumerLabel, int lines,
-                                int fd) implements NativeMemoryAccess {
+public record HandleRequestStruct(int[] lineOffsets, int flags, byte[] defaultValues, byte[] consumerLabel, int lines,
+                                  int fd) implements NativeMemoryLayout {
 
     private static final MemoryLayout LAYOUT = MemoryLayout.structLayout(
             MemoryLayout.sequenceLayout(64, ValueLayout.JAVA_INT).withName("lineOffsets"),
@@ -37,13 +32,13 @@ public record GPIOHandleRequest(int[] lineOffsets, int flags, byte[] defaultValu
         return LAYOUT;
     }
 
-    private static MemorySegment invokeExact(MethodHandle handle, MemorySegment buffer) throws Throwable {
+     static MemorySegment invokeExact(MethodHandle handle, MemorySegment buffer) throws Throwable {
         return ((MemorySegment) handle.invokeExact(buffer));
     }
 
     @Override
-    public GPIOHandleRequest fromBytes(MemorySegment buffer) throws Throwable {
-        return new GPIOHandleRequest(
+    public HandleRequestStruct fromBytes(MemorySegment buffer) throws Throwable {
+        return new HandleRequestStruct(
                 invokeExact(MH_LINE_OFFSETS, buffer).toArray(ValueLayout.JAVA_INT),
                 (int) VH_FLAGS.get(buffer),
                 invokeExact(MH_DEFAULT_VALUES, buffer).toArray(ValueLayout.JAVA_BYTE),

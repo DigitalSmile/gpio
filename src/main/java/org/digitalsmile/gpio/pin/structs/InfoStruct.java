@@ -1,6 +1,6 @@
-package org.ds.io.gpio.model;
+package org.digitalsmile.gpio.pin.structs;
 
-import org.ds.io.core.NativeMemoryAccess;
+import org.digitalsmile.gpio.core.NativeMemoryLayout;
 
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
@@ -8,7 +8,7 @@ import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 
-public record GPIOInfo(byte[] name, byte[] label, int lines) implements NativeMemoryAccess {
+public record InfoStruct(byte[] name, byte[] label, int lines) implements NativeMemoryLayout {
     private static final MemoryLayout LAYOUT = MemoryLayout.structLayout(
             MemoryLayout.sequenceLayout(32, ValueLayout.JAVA_BYTE).withName("name"),
             MemoryLayout.sequenceLayout(32, ValueLayout.JAVA_BYTE).withName("label"),
@@ -24,9 +24,10 @@ public record GPIOInfo(byte[] name, byte[] label, int lines) implements NativeMe
         return LAYOUT;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public GPIOInfo fromBytes(MemorySegment buffer) throws Throwable {
-        return new GPIOInfo(
+    public InfoStruct fromBytes(MemorySegment buffer) throws Throwable {
+        return new InfoStruct(
                 invokeExact(MH_NAME, buffer).toArray(ValueLayout.JAVA_BYTE),
                 invokeExact(MH_LABEL, buffer).toArray(ValueLayout.JAVA_BYTE),
                 (int) VH_LINES.get(buffer)

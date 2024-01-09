@@ -1,4 +1,4 @@
-package org.ds.io.spi;
+package org.digitalsmile.gpio.spi;
 
 public enum SPIMode {
     MODE_0(0),

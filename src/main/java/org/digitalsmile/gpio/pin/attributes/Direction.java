@@ -1,11 +1,11 @@
-package org.ds.io.gpio;
+package org.digitalsmile.gpio.pin.attributes;
 
-public enum GPIODirection {
+public enum Direction {
     INPUT(1), OUTPUT(1 << 1);
 
 
     private final int mode;
-    GPIODirection(int mode) {
+    Direction(int mode) {
         this.mode = mode;
     }
 

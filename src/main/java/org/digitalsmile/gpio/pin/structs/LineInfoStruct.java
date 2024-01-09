@@ -1,6 +1,6 @@
-package org.ds.io.gpio.model;
+package org.digitalsmile.gpio.pin.structs;
 
-import org.ds.io.core.NativeMemoryAccess;
+import org.digitalsmile.gpio.core.NativeMemoryLayout;
 
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
@@ -8,8 +8,8 @@ import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 
-public record GPIOLineInfo(int offset, int flags, byte[] name, byte[] consumer) implements NativeMemoryAccess {
-    private static MemoryLayout LAYOUT = MemoryLayout.structLayout(
+public record LineInfoStruct(int offset, int flags, byte[] name, byte[] consumer) implements NativeMemoryLayout {
+    private final static MemoryLayout LAYOUT = MemoryLayout.structLayout(
             ValueLayout.JAVA_INT.withName("offset"),
             ValueLayout.JAVA_INT.withName("flags"),
             MemoryLayout.sequenceLayout(32, ValueLayout.JAVA_BYTE).withName("name"),
@@ -26,9 +26,10 @@ public record GPIOLineInfo(int offset, int flags, byte[] name, byte[] consumer) 
         return LAYOUT;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public GPIOLineInfo fromBytes(MemorySegment buffer) throws Throwable {
-        return new GPIOLineInfo(
+    public LineInfoStruct fromBytes(MemorySegment buffer) throws Throwable {
+        return new LineInfoStruct(
                 (int) VH_OFFSET.get(buffer),
                 (int) VH_FLAGS.get(buffer),
                 invokeExact(MH_NAME, buffer).toArray(ValueLayout.JAVA_BYTE),
@@ -63,29 +64,6 @@ public record GPIOLineInfo(int offset, int flags, byte[] name, byte[] consumer) 
     private static MemorySegment invokeExact(MethodHandle handle, MemorySegment buffer) throws Throwable {
         return ((MemorySegment) handle.invokeExact(buffer));
     }
-
-    //    public static GPIOLineInfo fromBytes(byte[] buffer) {
-//        var d = new DataInputStream(new ByteArrayInputStream(buffer));
-//        try {
-//            return new GPIOLineInfo(
-//                    d.readUnsignedByte(),
-//                    d.readUnsignedByte(),
-//                    new String(d.readNBytes(32)),
-//                    new String(d.readNBytes(32))
-//            );
-//        } catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
-//    }
-//
-//    public static ByteBuffer toBytes(int offset, int flags, String name, String consumer) {
-//        var byteBuffer = ByteBuffer.allocate((int) allocationSize());
-//        byteBuffer.put((byte) offset);
-//        byteBuffer.putInt(flags);
-//        byteBuffer.put(name.getBytes());
-//        byteBuffer.put(consumer.getBytes());
-//        return byteBuffer;
-//    }
 
 
 }
