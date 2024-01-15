@@ -1,6 +1,7 @@
 package org.digitalsmile.gpio.spi;
 
 import org.digitalsmile.gpio.GPIOBoard;
+import org.digitalsmile.gpio.core.exception.NativeException;
 import org.digitalsmile.gpio.core.file.FileDescriptor;
 import org.digitalsmile.gpio.core.ioctl.Command;
 import org.digitalsmile.gpio.core.ioctl.IOCtl;
@@ -36,12 +37,12 @@ public final class SPIBus {
      * @param clockFrequency - desired clock frequency of SPI bus
      * @param byteLength     - byte length to be configured (usually 8)
      * @param bitOrdering    - bit ordering in the byte
-     * @throws IOException if errors occurred during creating instance
+     * @throws NativeException if errors occurred during creating instance
      */
-    public SPIBus(String spiPath, int busNumber, SPIMode spiMode, int clockFrequency, int byteLength, int bitOrdering) throws IOException {
+    public SPIBus(String spiPath, int busNumber, SPIMode spiMode, int clockFrequency, int byteLength, int bitOrdering) throws NativeException {
         System.out.println(walker.getCallerClass());
         if (!walker.getCallerClass().equals(GPIOBoard.class)) {
-            throw new IOException("Wrong call of constructor, SPIBus should be created by using GPIOBoard.ofSPI(...) methods.");
+            throw new RuntimeException("Wrong call of constructor, SPIBus should be created by using GPIOBoard.ofSPI(...) methods.");
         }
         this.path = spiPath + busNumber;
         this.spiMode = spiMode;
@@ -79,9 +80,9 @@ public final class SPIBus {
      * Sets the new clock frequency of SPI Bus and reinitialize the device.
      *
      * @param clockFrequency - new clock frequency to SPI Bus
-     * @throws IOException if errors occurred during reinitializing
+     * @throws NativeException if errors occurred during reinitializing
      */
-    public void setClockFrequency(int clockFrequency) throws IOException {
+    public void setClockFrequency(int clockFrequency) throws NativeException {
         this.clockFrequency = clockFrequency;
         logger.info("{} - clock frequency changed, reinitialize SPIBus...", path);
         init();
@@ -100,9 +101,9 @@ public final class SPIBus {
      * Sets the new SPI mode of SPI Bus and reinitialize the device.
      *
      * @param spiMode - new SPI mode
-     * @throws IOException if errors occurred during reinitializing
+     * @throws NativeException if errors occurred during reinitializing
      */
-    public void setSPIMode(SPIMode spiMode) throws IOException {
+    public void setSPIMode(SPIMode spiMode) throws NativeException {
         this.spiMode = spiMode;
         logger.info("{} - spi mode changed, reinitialize SPIBus...", path);
         init();
@@ -121,9 +122,9 @@ public final class SPIBus {
      * Sets the new byte length of SPI Bus and reinitialize the device.
      *
      * @param byteLength - new byte length
-     * @throws IOException if errors occurred during reinitializing
+     * @throws NativeException if errors occurred during reinitializing
      */
-    public void setByteLength(int byteLength) throws IOException {
+    public void setByteLength(int byteLength) throws NativeException {
         this.byteLength = byteLength;
         logger.info("{} - byte length changed, reinitialize SPIBus...", path);
         init();
@@ -142,9 +143,9 @@ public final class SPIBus {
      * Sets the new bit ordering of SPI Bus and reinitialize the device.
      *
      * @param bitOrdering - new bit ordering
-     * @throws IOException if errors occurred during reinitializing
+     * @throws NativeException if errors occurred during reinitializing
      */
-    public void setBitOrdering(int bitOrdering) throws IOException {
+    public void setBitOrdering(int bitOrdering) throws NativeException {
         this.bitOrdering = bitOrdering;
         logger.info("{} - bit ordering changed, reinitialize SPIBus...", path);
         init();
@@ -153,9 +154,9 @@ public final class SPIBus {
     /**
      * Initialize the SPI Bus.
      *
-     * @throws IOException if errors occurred during initialization
+     * @throws NativeException if errors occurred during initialization
      */
-    public void init() throws IOException {
+    public void init() throws NativeException {
         checkClosed();
         logger.debug("{} - setting SPI Mode to {}.", path, spiMode);
         IOCtl.call(spiFileDescriptor, Command.getSpiIocWrMode(), spiMode.getValue());
@@ -173,9 +174,9 @@ public final class SPIBus {
      * @param data          - data to be sent to bus
      * @param immediateRead - indicates if we should immediately read from bus after writing
      * @return byte array with data or zero length byte array (if no immediate read)
-     * @throws IOException if error occurred during writing the SPI Bus
+     * @throws NativeException if error occurred during writing the SPI Bus
      */
-    public byte[] sendByteData(byte[] data, boolean immediateRead) throws IOException {
+    public byte[] sendByteData(byte[] data, boolean immediateRead) throws NativeException {
         checkClosed();
         logger.trace("{} - writing data {}.", path, data);
         FileDescriptor.write(spiFileDescriptor, data);
@@ -188,8 +189,10 @@ public final class SPIBus {
 
     /**
      * Closes the SPI Bus. Object must be recreated if used after closing.
+     *
+     * @throws NativeException if error occurred during closing the SPI Bus
      */
-    public void close() {
+    public void close() throws NativeException {
         logger.info("{} - closing SPIBus.", path);
         FileDescriptor.close(spiFileDescriptor);
         this.closed = true;
@@ -198,12 +201,10 @@ public final class SPIBus {
 
     /**
      * Checks if SPI Bus is closed.
-     *
-     * @throws IOException if SPI Bus is closed
      */
-    private void checkClosed() throws IOException {
+    private void checkClosed() {
         if (closed) {
-            throw new IOException("SPI bus  " + path + " is closed");
+            throw new RuntimeException("SPI bus  " + path + " is closed");
         }
     }
 

@@ -1,6 +1,7 @@
 package org.digitalsmile.gpio.pin;
 
 import org.digitalsmile.gpio.GPIOBoard;
+import org.digitalsmile.gpio.core.exception.NativeException;
 import org.digitalsmile.gpio.core.file.FileDescriptor;
 import org.digitalsmile.gpio.core.ioctl.Command;
 import org.digitalsmile.gpio.core.ioctl.IOCtl;
@@ -47,23 +48,23 @@ public final class Pin {
      * @param deviceName - gpio device name
      * @param gpioPin    - pin gpio number
      * @param direction  - direction, e.g. write or read
-     * @throws IOException if errors occurred during creating instance
+     * @throws NativeException if errors occurred during creating instance
      */
-    public Pin(String deviceName, int gpioPin, Direction direction) throws IOException {
+    public Pin(String deviceName, int gpioPin, Direction direction) throws NativeException {
         if (!walker.getCallerClass().equals(GPIOBoard.class)) {
-            throw new IOException("Wrong call of constructor, Pin should be created by using GPIOBoard.ofPin(...) methods.");
+            throw new RuntimeException("Wrong call of constructor, Pin should be created by using GPIOBoard.ofPin(...) methods.");
         }
         this.deviceName = deviceName;
         this.pin = gpioPin;
         logger.info("{}-{} - setting up GPIO Pin...", deviceName, gpioPin);
         logger.debug("{}-{} - opening device file.", deviceName, gpioPin);
         this.fd = FileDescriptor.open(deviceName, Flag.O_RDONLY | Flag.O_CLOEXEC);
-        var data = new LineInfoStruct(gpioPin, 0, new byte[]{}, new byte[]{});
+        var lineInfoStruct = LineInfoStruct.create(gpioPin);
         logger.debug("{}-{} - getting line info.", deviceName, gpioPin);
-        this.lineInfoStruct = IOCtl.call(fd, Command.getGpioGetLineInfoIoctl(), data);
+        this.lineInfoStruct = IOCtl.call(fd, Command.getGpioGetLineInfoIoctl(), lineInfoStruct);
         if ((lineInfoStruct.flags() & org.digitalsmile.gpio.pin.attributes.Flag.KERNEL.getValue()) > 0) {
             close();
-            throw new IOException("Pin " + pin + " is blocked by Kernel");
+            throw new RuntimeException("Pin " + pin + " is blocked by Kernel");
         }
         setDirection(direction);
         logger.info("{}-{} - GPIO Pin configured.", deviceName, gpioPin);
@@ -109,17 +110,16 @@ public final class Pin {
      * Sets the direction of GPIO Pin.
      *
      * @param direction - new direction for GPIO Pin
-     * @throws IOException if errors occurred during direction change
+     * @throws NativeException if errors occurred during direction change
      */
-    public void setDirection(Direction direction) throws IOException {
+    public void setDirection(Direction direction) throws NativeException {
         checkClosed();
         if (direction.equals(this.direction)) {
             logger.warn("{}-{} - direction {} is already set.", deviceName, pin, direction);
             return;
         }
         logger.debug("{}-{} - setting direction to {}.", deviceName, pin, direction);
-        var label = "java-gpio".getBytes();
-        var gpioHandleRequest = new HandleRequestStruct(new int[]{pin}, direction.getMode(), new byte[]{}, label, 1, 0);
+        var gpioHandleRequest = HandleRequestStruct.createEmpty(pin, direction.getMode(), "org.digitalsmile.gpio");
         var result = IOCtl.call(fd, Command.getGpioGetLineHandleIoctl(), gpioHandleRequest);
         this.fd = result.fd();
         this.direction = direction;
@@ -127,8 +127,10 @@ public final class Pin {
 
     /**
      * Closes the GPIO Pin. Object must be recreated if you have to use it after.
+     *
+     * @throws NativeException if errors occurred during closing file descriptor
      */
-    public void close() {
+    public void close() throws NativeException {
         logger.info("{}-{} - closing GPIO Pin.", deviceName, pin);
         FileDescriptor.close(fd);
         executorService.close();
@@ -141,16 +143,16 @@ public final class Pin {
      * Reads the state of GPIO Pin.
      *
      * @return the state of GPIO Pin
-     * @throws IOException if errors occurred during reading the state
+     * @throws NativeException if errors occurred during reading the state
      */
-    public State read() throws IOException {
+    public State read() throws NativeException {
         checkClosed();
         checkDirection();
         if (Direction.OUTPUT.equals(this.direction)) {
-            throw new IOException("Can't read from output pin " + new String(lineInfoStruct.name()) + ". The direction is set to output");
+            throw new RuntimeException("Can't read from output pin " + new String(lineInfoStruct.name()) + ". The direction is set to output");
         }
         logger.trace("{}-{} - reading GPIO Pin.", deviceName, pin);
-        var gpioHandleData = new HandleDataStruct(new byte[1]);
+        var gpioHandleData = HandleDataStruct.createEmpty();
         var result = IOCtl.call(fd, Command.getGpioHandleGetLineValuesIoctl(), gpioHandleData);
         this.state = result.values()[0] == 1 ? State.HIGH : State.LOW;
         logger.trace("{}-{} - new GPIO Pin state is {}.", deviceName, pin, state);
@@ -161,16 +163,16 @@ public final class Pin {
      * Writes the state to GPIO Pin.
      *
      * @param state the state to be written
-     * @throws IOException if errors occurred during writing new state
+     * @throws NativeException if errors occurred during writing new state
      */
-    public void write(State state) throws IOException {
+    public void write(State state) throws NativeException {
         checkClosed();
         checkDirection();
         if (Direction.INPUT.equals(this.direction)) {
-            throw new IOException("Can't write to input pin " + new String(lineInfoStruct.name()) + ". The direction is set to input.");
+            throw new RuntimeException("Can't write to input pin " + new String(lineInfoStruct.name()) + ". The direction is set to input.");
         }
         logger.trace("{}-{} - setting GPIO Pin to state {}.", deviceName, pin, state);
-        var gpioHandleData = new HandleDataStruct(new byte[]{state.getValue()});
+        var gpioHandleData = HandleDataStruct.create(state.getValue());
         IOCtl.call(fd, Command.getGpioHandleSetLineValuesIoctl(), gpioHandleData);
         this.state = state;
     }
@@ -178,22 +180,20 @@ public final class Pin {
     /**
      * Checks if direction is explicitly set.
      *
-     * @throws IOException if direction is no set
      */
-    private void checkDirection() throws IOException {
+    private void checkDirection() {
         if (direction == null) {
-            throw new IOException("Pin " + pin + " direction not set");
+            throw new RuntimeException("Pin " + pin + " direction not set");
         }
     }
 
     /**
      * Checks if GPIO Pin is closed.
      *
-     * @throws IOException if GPIO Pin is closed
      */
-    private void checkClosed() throws IOException {
+    private void checkClosed() {
         if (closed) {
-            throw new IOException("Pin " + pin + " is closed");
+            throw new RuntimeException("Pin " + pin + " is closed");
         }
     }
 
@@ -281,10 +281,9 @@ public final class Pin {
                     }
                 }
                 currentState = newState;
-            } catch (IOException e) {
+            } catch (NativeException e) {
                 logger.error("{}-{} - error while watching for event {}.", deviceName, pin, event);
                 logger.error(e.getMessage());
-                throw new RuntimeException(e);
             }
         }
 

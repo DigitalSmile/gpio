@@ -19,13 +19,16 @@ public class IntegerToHex {
      * @return hexadecimal string representation of integer (byte)
      */
     public static String convert(int input) {
-        var builder = new StringBuilder();
-        builder.setLength(8);
-        for (int i = 7; i >= 0; i--) {
-            builder.setCharAt(i, digits.charAt(input & 15));
-            input >>= 4;
-        }
-        builder.insert(0, "0x");
-        return builder.toString();
+        return String.format("0x%06x", input);
+    }
+
+    /**
+     * Converts given long (byte) input into hexadecimal string.
+     *
+     * @param input - long (byte) input to convert
+     * @return hexadecimal string representation of long (byte)
+     */
+    public static String convert(long input) {
+        return String.format("0x%06x", input);
     }
 }

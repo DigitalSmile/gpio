@@ -30,6 +30,16 @@ public record LineInfoStruct(int offset, int flags, byte[] name, byte[] consumer
     private static final MethodHandle MH_NAME = LAYOUT.sliceHandle(MemoryLayout.PathElement.groupElement("name"));
     private static final MethodHandle MH_CONSUMER = LAYOUT.sliceHandle(MemoryLayout.PathElement.groupElement("consumer"));
 
+    /**
+     * Helper method to create structure with given PIN.
+     *
+     * @param pin the pin
+     * @return LineInfoStruct structure
+     */
+    public static LineInfoStruct create(int pin) {
+        return new LineInfoStruct(pin, 0, new byte[]{}, new byte[]{});
+    }
+
     @Override
     public MemoryLayout getMemoryLayout() {
         return LAYOUT;

@@ -27,6 +27,15 @@ public record InfoStruct(byte[] name, byte[] label, int lines) implements Native
     private static final MethodHandle MH_LABEL = LAYOUT.sliceHandle(MemoryLayout.PathElement.groupElement("label"));
     private static final VarHandle VH_LINES = LAYOUT.varHandle(MemoryLayout.PathElement.groupElement("lines"));
 
+    /**
+     * Helper method to create empty structure.
+     *
+     * @return InfoStruct structure
+     */
+    public static InfoStruct createEmpty() {
+        return new InfoStruct(new byte[]{}, new byte[]{}, 0);
+    }
+
     @Override
     public MemoryLayout getMemoryLayout() {
         return LAYOUT;

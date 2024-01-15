@@ -38,6 +38,18 @@ public record HandleRequestStruct(int[] lineOffsets, int flags, byte[] defaultVa
     private static final VarHandle VH_FD = LAYOUT.varHandle(MemoryLayout.PathElement.groupElement("fd"));
 
 
+    /**
+     * Helper method to create structure with pin, mode and consumer label.
+     *
+     * @param pin   the pin
+     * @param mode  the mode
+     * @param label the label
+     * @return HandleRequestStruct structure
+     */
+    public static HandleRequestStruct createEmpty(int pin, int mode, String label) {
+        return new HandleRequestStruct(new int[]{pin}, mode, new byte[]{}, label.getBytes(), 1, 0);
+    }
+
     @Override
     public MemoryLayout getMemoryLayout() {
         return LAYOUT;

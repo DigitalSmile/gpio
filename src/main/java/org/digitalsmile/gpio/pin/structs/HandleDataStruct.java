@@ -16,6 +16,25 @@ public record HandleDataStruct(byte[] values) implements NativeMemoryLayout {
     // see https://elixir.bootlin.com/linux/v6.7/source/include/uapi/linux/gpio.h#L449
     private static final MemoryLayout LAYOUT = MemoryLayout.sequenceLayout(64, ValueLayout.JAVA_BYTE);
 
+    /**
+     * Helper method to create empty structure.
+     *
+     * @return empty HandleDataStruct structure
+     */
+    public static HandleDataStruct createEmpty() {
+        return new HandleDataStruct(new byte[1]);
+    }
+
+    /**
+     * Helper method to create structure with byte value (PIN state).
+     *
+     * @param value the state of Pin
+     * @return HandleDataStruct structure
+     */
+    public static HandleDataStruct create(byte value) {
+        return new HandleDataStruct(new byte[]{value});
+    }
+
     @Override
     public MemoryLayout getMemoryLayout() {
         return LAYOUT;
