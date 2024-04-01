@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'maven-publish'
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
 group = 'org.digitalsmile'
@@ -26,6 +27,11 @@ java {
 
 dependencies {
     implementation 'org.slf4j:slf4j-api:2.0.9'
+    implementation 'ch.qos.logback:logback-core:1.4.12'
+    implementation 'ch.qos.logback:logback-classic:1.4.12'
+    implementation 'io.quarkiverse.jef:linux-core:3.0.2'
+    implementation 'io.quarkiverse.jef:mcu-core:3.0.2'
+    implementation 'io.quarkiverse.jef:device-library:3.0.2'
 
     testImplementation platform('org.junit:junit-bom:5.9.1')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -34,6 +40,10 @@ dependencies {
 javadoc.options {
     addBooleanOption('-enable-preview', true)
     addStringOption('-release', '21')
+}
+
+tasks.jar {
+    manifest.attributes["Main-Class"] = "org.digitalsmile.gpio.GPIOBoard"
 }
 
 compileJava {

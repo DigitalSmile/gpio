@@ -74,4 +74,20 @@ public final class Command {
     public static long getGpioHandleSetLineValuesIoctl() {
         return Internals.GPIOHANDLE_SET_LINE_VALUES_IOCTL;
     }
+
+    public static long getI2CSlave() {
+        return 0x0703L;
+    }
+
+    public static long getI2CTenBit() {
+        return 0x0704L;
+    }
+
+    public static long getI2CSMBus() {
+        return 0x0720L;
+    }
+
+    public static long getI2CFuncs() {
+        return 0x0705L;
+    }
 }

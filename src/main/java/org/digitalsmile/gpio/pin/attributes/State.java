@@ -18,7 +18,7 @@ public enum State {
     /**
      * Constructs the State from given integer value.
      *
-     * @param state - integer value of the State
+     * @param state integer value of the State
      */
     State(int state) {
         this.value = state;

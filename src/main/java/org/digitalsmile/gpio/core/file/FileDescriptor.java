@@ -52,10 +52,10 @@ public final class FileDescriptor {
     }
 
     /**
-     * Opens file at path with selected flag ({@link Flag}).
+     * Opens file at path with selected flag ({@link FileFlag}).
      *
-     * @param path     - the file to open
-     * @param openFlag - flag to handle with file ({@link Flag})
+     * @param path     the file to open
+     * @param openFlag flag to handle with file ({@link FileFlag})
      * @return file descriptor if file is successfully open
      * @throws NativeException when file path cannot be opened
      */
@@ -69,8 +69,10 @@ public final class FileDescriptor {
             if (fd < 0) {
                 int errno = (int) ERRNO_HANDLE.get(capturedState);
                 var errnoStr = (MemorySegment) STR_ERROR.invokeExact(errno);
-                throw new RuntimeException("Cannot open path '" + path + "': " + errnoStr.getUtf8String(0) + " (" + errno + ")");
+                throw new NativeException("Cannot open path '" + path + "': " + errnoStr.getUtf8String(0) + " (" + errno + ")", errno);
             }
+        } catch (NativeException e) {
+            throw e;
         } catch (Throwable e) {
             throw new NativeException(e.getMessage(), e);
         }
@@ -79,21 +81,21 @@ public final class FileDescriptor {
     }
 
     /**
-     * Opens file at path with flag {@link Flag}
+     * Opens file at path with flag {@link FileFlag}
      *
-     * @param path - the file to open
+     * @param path the file to open
      * @return file descriptor if file is successfully open
      * @throws NativeException when file path cannot be opened
      */
     public static int open(String path) throws NativeException {
-        return open(path, Flag.O_RDWR);
+        return open(path, FileFlag.O_RDWR);
     }
 
 
     /**
      * Closes given file descriptor.
      *
-     * @param fd - file descriptor to close
+     * @param fd file descriptor to close
      * @throws NativeException when file descriptor cannot be closed
      */
     public static void close(int fd) throws NativeException {
@@ -104,9 +106,11 @@ public final class FileDescriptor {
             if (result < 0) {
                 int errno = (int) ERRNO_HANDLE.get(capturedState);
                 var errnoStr = (MemorySegment) STR_ERROR.invokeExact(errno);
-                throw new RuntimeException("Cannot close file descriptor '" + fd + "': " + errnoStr.getUtf8String(0) + " (" + errno + ")");
+                throw new NativeException("Cannot close file descriptor '" + fd + "': " + errnoStr.getUtf8String(0) + " (" + errno + ")", errno);
             }
             logger.trace("Closed file descriptor with result {}", result);
+        } catch (NativeException e) {
+            throw e;
         } catch (Throwable e) {
             throw new NativeException(e.getMessage(), e);
         }
@@ -115,8 +119,8 @@ public final class FileDescriptor {
     /**
      * Reads file descriptor with predefined size.
      *
-     * @param fd   - file descriptor to read
-     * @param size - size of the byte buffer to read into
+     * @param fd   file descriptor to read
+     * @param size size of the byte buffer to read into
      * @return byte array with contents of the read file descriptor
      * @throws NativeException when file descriptor cannot be read
      */
@@ -130,10 +134,12 @@ public final class FileDescriptor {
             if (read == -1) {
                 int errno = (int) ERRNO_HANDLE.get(capturedState);
                 var errnoStr = (MemorySegment) STR_ERROR.invokeExact(errno);
-                throw new RuntimeException("Cannot read from file descriptor '" + fd + "': " + errnoStr.getUtf8String(0) + " (" + errno + ")");
+                throw new NativeException("Cannot read from file descriptor '" + fd + "': " + errnoStr.getUtf8String(0) + " (" + errno + ")", errno);
             }
             logger.trace("Read {} of {} bytes", read, size);
             byteResult = bufferMemorySegment.toArray(ValueLayout.JAVA_BYTE);
+        } catch (NativeException e) {
+            throw e;
         } catch (Throwable e) {
             throw new NativeException(e.getMessage(), e);
         }
@@ -144,25 +150,30 @@ public final class FileDescriptor {
     /**
      * Writes byte array data to the provided file descriptor.
      *
-     * @param fd   - file descriptor to write
-     * @param data - byte array of data to write
+     * @param fd   file descriptor to write
+     * @param data byte array of data to write
+     * @return wrote bytes
      * @throws NativeException when file descriptor cannot be written
      */
-    public static void write(int fd, byte[] data) throws NativeException {
+    public static int write(int fd, byte[] data) throws NativeException {
         logger.trace("Writing to file descriptor {} with data {}", fd, Arrays.toString(data));
+        var wrote = 0;
         try (Arena offHeap = Arena.ofConfined()) {
             var bufferMemorySegment = offHeap.allocateArray(ValueLayout.JAVA_BYTE, data);
             var capturedState = offHeap.allocate(CAPTURED_STATE_LAYOUT);
-            var wrote = (int) WRITE.invoke(capturedState, fd, bufferMemorySegment, data.length);
+            wrote = (int) WRITE.invoke(capturedState, fd, bufferMemorySegment, data.length);
             if (wrote == -1) {
                 int errno = (int) ERRNO_HANDLE.get(capturedState);
                 var errnoStr = (MemorySegment) STR_ERROR.invokeExact(errno);
-                throw new RuntimeException("Cannot write to file descriptor '" + fd + "': " + errnoStr.getUtf8String(0) + " (" + errno + ")");
+                throw new NativeException("Cannot write to file descriptor '" + fd + "': " + errnoStr.getUtf8String(0) + " (" + errno + ")", errno);
             }
             logger.trace("Wrote {} of {} bytes", wrote, data.length);
+        } catch (NativeException e) {
+            throw e;
         } catch (Throwable e) {
             throw new NativeException(e.getMessage(), e);
         }
         logger.trace("Wrote to file descriptor {}", fd);
+        return wrote;
     }
 }

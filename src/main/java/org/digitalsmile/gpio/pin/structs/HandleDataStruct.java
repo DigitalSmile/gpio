@@ -10,7 +10,7 @@ import java.util.Arrays;
 /**
  * Structure the represents GPIO data to send with ioctl.
  *
- * @param values - data to send through GPIO
+ * @param values data to send through GPIO
  */
 public record HandleDataStruct(byte[] values) implements NativeMemoryLayout {
     // see https://elixir.bootlin.com/linux/v6.7/source/include/uapi/linux/gpio.h#L449

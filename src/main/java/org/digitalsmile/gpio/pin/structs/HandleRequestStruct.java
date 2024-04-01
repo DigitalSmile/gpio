@@ -10,12 +10,12 @@ import java.util.Arrays;
 /**
  * Structure the represents GPIO data to send with ioctl.
  *
- * @param lineOffsets   - line offset
- * @param flags         - flags
- * @param defaultValues - default values
- * @param consumerLabel - consumer labels
- * @param lines         - lines
- * @param fd            - file descriptor
+ * @param lineOffsets   line offset
+ * @param flags         flags
+ * @param defaultValues default values
+ * @param consumerLabel consumer labels
+ * @param lines         lines
+ * @param fd            file descriptor
  */
 public record HandleRequestStruct(int[] lineOffsets, int flags, byte[] defaultValues, byte[] consumerLabel, int lines,
                                   int fd) implements NativeMemoryLayout {

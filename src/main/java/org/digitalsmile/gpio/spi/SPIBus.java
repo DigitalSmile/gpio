@@ -5,10 +5,9 @@ import org.digitalsmile.gpio.core.exception.NativeException;
 import org.digitalsmile.gpio.core.file.FileDescriptor;
 import org.digitalsmile.gpio.core.ioctl.Command;
 import org.digitalsmile.gpio.core.ioctl.IOCtl;
+import org.digitalsmile.gpio.spi.attributes.Mode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
 
 /**
  * Class for creating GPIO SPIBus object. It uses native FFM calls (such as open and ioctl) to operate with hardware.
@@ -19,7 +18,7 @@ public final class SPIBus {
     private static final StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
 
     private final String path;
-    private SPIMode spiMode;
+    private Mode mode;
     private int clockFrequency;
     private int byteLength;
     private int bitOrdering;
@@ -31,21 +30,20 @@ public final class SPIBus {
      * Constructs SPIBus object with given path, bus number, SPI mode, clock frequency, length of byte and bit order.
      * Instance of SPIBus can only be created from {@link GPIOBoard} class, because we need to initialize GPIO device first and run some validations beforehand.
      *
-     * @param spiPath        - path to SPI bus device
-     * @param busNumber      - bus number
-     * @param spiMode        - SPI mode to be configured
-     * @param clockFrequency - desired clock frequency of SPI bus
-     * @param byteLength     - byte length to be configured (usually 8)
-     * @param bitOrdering    - bit ordering in the byte
+     * @param spiPath        path to SPI bus device
+     * @param busNumber      bus number
+     * @param mode           SPI mode to be configured
+     * @param clockFrequency desired clock frequency of SPI bus
+     * @param byteLength     byte length to be configured (usually 8)
+     * @param bitOrdering    bit ordering in the byte
      * @throws NativeException if errors occurred during creating instance
      */
-    public SPIBus(String spiPath, int busNumber, SPIMode spiMode, int clockFrequency, int byteLength, int bitOrdering) throws NativeException {
-        System.out.println(walker.getCallerClass());
+    public SPIBus(String spiPath, int busNumber, Mode mode, int clockFrequency, int byteLength, int bitOrdering) throws NativeException {
         if (!walker.getCallerClass().equals(GPIOBoard.class)) {
             throw new RuntimeException("Wrong call of constructor, SPIBus should be created by using GPIOBoard.ofSPI(...) methods.");
         }
         this.path = spiPath + busNumber;
-        this.spiMode = spiMode;
+        this.mode = mode;
         this.clockFrequency = clockFrequency;
         this.byteLength = byteLength;
         this.bitOrdering = bitOrdering;
@@ -79,7 +77,7 @@ public final class SPIBus {
     /**
      * Sets the new clock frequency of SPI Bus and reinitialize the device.
      *
-     * @param clockFrequency - new clock frequency to SPI Bus
+     * @param clockFrequency new clock frequency to SPI Bus
      * @throws NativeException if errors occurred during reinitializing
      */
     public void setClockFrequency(int clockFrequency) throws NativeException {
@@ -93,18 +91,18 @@ public final class SPIBus {
      *
      * @return the SPI Bus mode
      */
-    public SPIMode getSPIMode() {
-        return spiMode;
+    public Mode getSPIMode() {
+        return mode;
     }
 
     /**
      * Sets the new SPI mode of SPI Bus and reinitialize the device.
      *
-     * @param spiMode - new SPI mode
+     * @param mode new SPI mode
      * @throws NativeException if errors occurred during reinitializing
      */
-    public void setSPIMode(SPIMode spiMode) throws NativeException {
-        this.spiMode = spiMode;
+    public void setSPIMode(Mode mode) throws NativeException {
+        this.mode = mode;
         logger.info("{} - spi mode changed, reinitialize SPIBus...", path);
         init();
     }
@@ -121,7 +119,7 @@ public final class SPIBus {
     /**
      * Sets the new byte length of SPI Bus and reinitialize the device.
      *
-     * @param byteLength - new byte length
+     * @param byteLength new byte length
      * @throws NativeException if errors occurred during reinitializing
      */
     public void setByteLength(int byteLength) throws NativeException {
@@ -142,7 +140,7 @@ public final class SPIBus {
     /**
      * Sets the new bit ordering of SPI Bus and reinitialize the device.
      *
-     * @param bitOrdering - new bit ordering
+     * @param bitOrdering new bit ordering
      * @throws NativeException if errors occurred during reinitializing
      */
     public void setBitOrdering(int bitOrdering) throws NativeException {
@@ -158,8 +156,8 @@ public final class SPIBus {
      */
     public void init() throws NativeException {
         checkClosed();
-        logger.debug("{} - setting SPI Mode to {}.", path, spiMode);
-        IOCtl.call(spiFileDescriptor, Command.getSpiIocWrMode(), spiMode.getValue());
+        logger.debug("{} - setting SPI Mode to {}.", path, mode);
+        IOCtl.call(spiFileDescriptor, Command.getSpiIocWrMode(), mode.getValue());
         logger.debug("{} - setting Bit Ordering to {}.", path, bitOrdering);
         IOCtl.call(spiFileDescriptor, Command.getSpiIocWrLsbFirst(), bitOrdering);
         logger.debug("{} - setting Byte Length to {}.", path, byteLength);
@@ -171,8 +169,8 @@ public final class SPIBus {
     /**
      * Sends the byte into SPI Bus. Can immediately read from bus or skip the returned value.
      *
-     * @param data          - data to be sent to bus
-     * @param immediateRead - indicates if we should immediately read from bus after writing
+     * @param data          data to be sent to bus
+     * @param immediateRead indicates if we should immediately read from bus after writing
      * @return byte array with data or zero length byte array (if no immediate read)
      * @throws NativeException if error occurred during writing the SPI Bus
      */
@@ -212,7 +210,7 @@ public final class SPIBus {
     public String toString() {
         return "SPIBus{" +
                 "path='" + path + '\'' +
-                ", spiMode=" + spiMode +
+                ", spiMode=" + mode +
                 ", clockFrequency=" + clockFrequency +
                 ", byteLength=" + byteLength +
                 ", bitOrdering=" + bitOrdering +

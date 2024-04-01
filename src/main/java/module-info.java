@@ -11,4 +11,7 @@ module gpio.main {
     exports org.digitalsmile.gpio.spi;
     exports org.digitalsmile.gpio.pin.event;
     exports org.digitalsmile.gpio;
+    exports org.digitalsmile.gpio.spi.attributes;
+    exports org.digitalsmile.gpio.i2c;
+    exports org.digitalsmile.gpio.i2c.attributes;
 }

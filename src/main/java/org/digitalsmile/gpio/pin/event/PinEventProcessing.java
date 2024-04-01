@@ -10,7 +10,7 @@ public interface PinEventProcessing {
     /**
      * Process the changed on the GPIO Pin.
      *
-     * @param state - new state of GPIO Pin
+     * @param state new state of GPIO Pin
      */
     void process(State state);
 }

@@ -1,11 +1,11 @@
-package org.digitalsmile.gpio.spi;
+package org.digitalsmile.gpio.spi.attributes;
 
 /**
  * Class represents the modes of SPI bus.
  *
  * @see <a href="https://en.wikipedia.org/wiki/Serial_Peripheral_Interface#Mode_numbers">SPI Modes on wikipedia</a>
  */
-public enum SPIMode {
+public enum Mode {
     /**
      * CPOL = 0
      * CPHA = 0
@@ -32,9 +32,9 @@ public enum SPIMode {
     /**
      * Constructs SPI Mode from given integer value.
      *
-     * @param value - integer value of SPI Mode
+     * @param value integer value of SPI Mode
      */
-    SPIMode(int value) {
+    Mode(int value) {
         this.value = value;
     }
 
@@ -50,10 +50,10 @@ public enum SPIMode {
     /**
      * Gets SPI mode by given integer value.
      *
-     * @param value - given integer value of spi mode
+     * @param value given integer value of spi mode
      * @return spi mode
      */
-    public static SPIMode getSPIMode(int value) {
+    public static Mode getSPIMode(int value) {
         return switch (value) {
             case 0 -> MODE_0;
             case 0x01 -> MODE_1;

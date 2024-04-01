@@ -19,7 +19,7 @@ public enum Direction {
     /**
      * Constructs Direction from an integer mode.
      *
-     * @param mode - integer representation of direction
+     * @param mode integer representation of direction
      */
     Direction(int mode) {
         this.mode = mode;

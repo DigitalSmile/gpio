@@ -11,9 +11,9 @@ import java.lang.invoke.VarHandle;
 /**
  * Structure the represents GPIO data to send with ioctl.
  *
- * @param name  - name
- * @param label - label
- * @param lines - lines
+ * @param name  name
+ * @param label label
+ * @param lines lines
  */
 public record InfoStruct(byte[] name, byte[] label, int lines) implements NativeMemoryLayout {
     // see https://elixir.bootlin.com/linux/v6.7/source/include/uapi/linux/gpio.h#L32

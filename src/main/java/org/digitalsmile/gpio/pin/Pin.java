@@ -3,17 +3,16 @@ package org.digitalsmile.gpio.pin;
 import org.digitalsmile.gpio.GPIOBoard;
 import org.digitalsmile.gpio.core.exception.NativeException;
 import org.digitalsmile.gpio.core.file.FileDescriptor;
+import org.digitalsmile.gpio.core.file.FileFlag;
 import org.digitalsmile.gpio.core.ioctl.Command;
 import org.digitalsmile.gpio.core.ioctl.IOCtl;
-import org.digitalsmile.gpio.pin.attributes.*;
+import org.digitalsmile.gpio.pin.attributes.Direction;
+import org.digitalsmile.gpio.pin.attributes.State;
 import org.digitalsmile.gpio.pin.event.Event;
 import org.digitalsmile.gpio.pin.event.PinEventProcessing;
 import org.digitalsmile.gpio.pin.structs.HandleDataStruct;
 import org.digitalsmile.gpio.pin.structs.HandleRequestStruct;
 import org.digitalsmile.gpio.pin.structs.LineInfoStruct;
-import org.digitalsmile.gpio.core.file.Flag;
-import org.digitalsmile.gpio.spi.SPIBus;
-import org.digitalsmile.gpio.spi.SPIMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,9 +44,9 @@ public final class Pin {
      * Constructs GPIO Pin class from gpio device name, pin and direction (INPUT / OUTPUT).
      * Instance of Pin can only be created from {@link GPIOBoard} class, because we need to initialize GPIO device first and run some validations beforehand.
      *
-     * @param deviceName - gpio device name
-     * @param gpioPin    - pin gpio number
-     * @param direction  - direction, e.g. write or read
+     * @param deviceName gpio device name
+     * @param gpioPin    pin gpio number
+     * @param direction  direction, e.g. write or read
      * @throws NativeException if errors occurred during creating instance
      */
     public Pin(String deviceName, int gpioPin, Direction direction) throws NativeException {
@@ -58,7 +57,7 @@ public final class Pin {
         this.pin = gpioPin;
         logger.info("{}-{} - setting up GPIO Pin...", deviceName, gpioPin);
         logger.debug("{}-{} - opening device file.", deviceName, gpioPin);
-        this.fd = FileDescriptor.open(deviceName, Flag.O_RDONLY | Flag.O_CLOEXEC);
+        this.fd = FileDescriptor.open(deviceName, FileFlag.O_RDONLY | FileFlag.O_CLOEXEC);
         var lineInfoStruct = LineInfoStruct.create(gpioPin);
         logger.debug("{}-{} - getting line info.", deviceName, gpioPin);
         this.lineInfoStruct = IOCtl.call(fd, Command.getGpioGetLineInfoIoctl(), lineInfoStruct);
@@ -109,7 +108,7 @@ public final class Pin {
     /**
      * Sets the direction of GPIO Pin.
      *
-     * @param direction - new direction for GPIO Pin
+     * @param direction new direction for GPIO Pin
      * @throws NativeException if errors occurred during direction change
      */
     public void setDirection(Direction direction) throws NativeException {
@@ -179,7 +178,6 @@ public final class Pin {
 
     /**
      * Checks if direction is explicitly set.
-     *
      */
     private void checkDirection() {
         if (direction == null) {
@@ -189,7 +187,6 @@ public final class Pin {
 
     /**
      * Checks if GPIO Pin is closed.
-     *
      */
     private void checkClosed() {
         if (closed) {
@@ -200,8 +197,8 @@ public final class Pin {
     /**
      * Adds event detection listener, see {@link Event}.
      *
-     * @param event          - the event to detect
-     * @param eventProcessor - event processor callback
+     * @param event          the event to detect
+     * @param eventProcessor event processor callback
      * @return future to operate the task
      * @throws IOException if watcher is already set for the GPIO Pin
      */
@@ -241,8 +238,8 @@ public final class Pin {
         /**
          * Constructs the EventWatcher
          *
-         * @param event          - event
-         * @param eventProcessor - event processor
+         * @param event          event
+         * @param eventProcessor event processor
          */
         EventWatcher(Event event, PinEventProcessing eventProcessor) {
             this.event = event;
