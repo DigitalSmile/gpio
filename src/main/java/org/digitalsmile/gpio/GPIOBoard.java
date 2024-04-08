@@ -1,15 +1,25 @@
 package org.digitalsmile.gpio;
 
+import org.digitalsmile.gpio.core.IntegerToHex;
+import org.digitalsmile.gpio.core.NativeMemoryLayout;
 import org.digitalsmile.gpio.core.exception.NativeException;
 import org.digitalsmile.gpio.core.file.FileDescriptor;
 import org.digitalsmile.gpio.core.ioctl.Command;
 import org.digitalsmile.gpio.core.ioctl.IOCtl;
 import org.digitalsmile.gpio.i2c.I2CBus;
+import org.digitalsmile.gpio.pwm.PWMBus;
 import org.digitalsmile.gpio.pin.Pin;
 import org.digitalsmile.gpio.pin.attributes.Direction;
+import org.digitalsmile.gpio.pwm.attributes.Polarity;
 import org.digitalsmile.gpio.pin.structs.InfoStruct;
 import org.digitalsmile.gpio.spi.SPIBus;
 import org.digitalsmile.gpio.spi.attributes.Mode;
+
+import java.lang.foreign.*;
+import java.lang.invoke.VarHandle;
+import java.util.Arrays;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Class for creating abstractions over GPIO. It uses native FFM calls (such as open and ioctl) to operate with hardware.
@@ -149,6 +159,13 @@ public final class GPIOBoard {
         return ofI2C(BASE_I2C_PATH, busNumber);
     }
 
+    public static PWMBus ofPWMBus(int pwmChipNumber, int pwmBusNumber) throws NativeException {
+        return new PWMBus(pwmChipNumber, pwmBusNumber);
+    }
+
+    public static PWMBus ofPWMBus(int pwmBusNumber) throws NativeException {
+        return new PWMBus(0, pwmBusNumber);
+    }
 
     @Override
     public String toString() {
