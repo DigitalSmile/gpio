@@ -1,10 +1,10 @@
-package org.digitalsmile.gpio.core.exception;
+package org.digitalsmile.gpio;
 
 /**
  * Exception class to handle IO errors of Native code.
  * This is just a wrapper for errno message which is broadcast from Throwable.
  */
-public class NativeException extends Exception {
+public class NativeMemoryException extends Exception {
 
     /**
      * Error code for native exception
@@ -17,7 +17,7 @@ public class NativeException extends Exception {
      * @param rootMessage root message of exception
      * @param cause       cause of exception
      */
-    public NativeException(String rootMessage, Throwable cause) {
+    public NativeMemoryException(String rootMessage, Throwable cause) {
         super(rootMessage, cause);
     }
 
@@ -26,7 +26,7 @@ public class NativeException extends Exception {
      *
      * @param rootMessage root message of exception
      */
-    public NativeException(String rootMessage) {
+    public NativeMemoryException(String rootMessage) {
         super(rootMessage);
     }
 
@@ -36,7 +36,7 @@ public class NativeException extends Exception {
      * @param rootMessage root message of exception
      * @param errorCode   error code
      */
-    public NativeException(String rootMessage, int errorCode) {
+    public NativeMemoryException(String rootMessage, int errorCode) {
         super(rootMessage);
         this.errorCode = errorCode;
     }

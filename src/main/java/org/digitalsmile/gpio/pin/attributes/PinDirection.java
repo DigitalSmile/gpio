@@ -3,15 +3,15 @@ package org.digitalsmile.gpio.pin.attributes;
 /**
  * Direction of a GPIO Pin - to read from (INPUT) or to write to (OUTPUT)
  */
-public enum Direction {
+public enum PinDirection {
     /**
      * INPUT direction aka read
      */
-    INPUT(1),
+    INPUT(PinFlag.INPUT.getValue()),
     /**
      * OUTPUT direction aka write
      */
-    OUTPUT(1 << 1);
+    OUTPUT(PinFlag.OUTPUT.getValue());
 
 
     private final int mode;
@@ -21,7 +21,7 @@ public enum Direction {
      *
      * @param mode integer representation of direction
      */
-    Direction(int mode) {
+    PinDirection(int mode) {
         this.mode = mode;
     }
 

@@ -1,6 +1,6 @@
 package org.digitalsmile.gpio.pin.event;
 
-import org.digitalsmile.gpio.pin.attributes.State;
+import java.util.List;
 
 /**
  * Event processing callback. Can be used as functional interface in streams.
@@ -9,8 +9,10 @@ import org.digitalsmile.gpio.pin.attributes.State;
 public interface PinEventProcessing {
     /**
      * Process the changed on the GPIO Pin.
+     * WARNING: since the caller of this callback is heavily tight with linux poll, it is recommended to do processing as fast as possible in implementation part.
+     * If there is any heavy processing call it is recommended to offload it into different thread.
      *
-     * @param state new state of GPIO Pin
+     * @param eventList list of detected events
      */
-    void process(State state);
+    void process(List<DetectedEvent> eventList);
 }

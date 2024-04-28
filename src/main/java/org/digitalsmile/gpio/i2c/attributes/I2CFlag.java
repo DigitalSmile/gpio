@@ -3,12 +3,12 @@ package org.digitalsmile.gpio.i2c.attributes;
 /**
  * Flags used for controlling I2CBus communications.
  */
-public class Flag {
+public class I2CFlag {
 
     /**
      * Forbids creating an instance of this class.
      */
-    private Flag() {
+    private I2CFlag() {
     }
 
     /**
@@ -23,7 +23,7 @@ public class Flag {
     /**
      * Maximum block size of message
      */
-    public static final int  I2C_SMBUS_BLOCK_MAX	= 32;
+    public static final int I2C_SMBUS_BLOCK_MAX = 32;
     /**
      * Write byte of SMBus
      */

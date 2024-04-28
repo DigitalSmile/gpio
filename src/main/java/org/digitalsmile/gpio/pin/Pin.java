@@ -1,55 +1,67 @@
 package org.digitalsmile.gpio.pin;
 
 import org.digitalsmile.gpio.GPIOBoard;
-import org.digitalsmile.gpio.core.exception.NativeException;
+import org.digitalsmile.gpio.NativeMemoryException;
 import org.digitalsmile.gpio.core.file.FileDescriptor;
 import org.digitalsmile.gpio.core.file.FileFlag;
 import org.digitalsmile.gpio.core.ioctl.Command;
 import org.digitalsmile.gpio.core.ioctl.IOCtl;
-import org.digitalsmile.gpio.pin.attributes.Direction;
-import org.digitalsmile.gpio.pin.attributes.State;
-import org.digitalsmile.gpio.pin.event.Event;
+import org.digitalsmile.gpio.core.poll.Poll;
+import org.digitalsmile.gpio.core.poll.PollFlag;
+import org.digitalsmile.gpio.core.poll.PollingData;
+import org.digitalsmile.gpio.pin.attributes.PinDirection;
+import org.digitalsmile.gpio.pin.attributes.PinEvent;
+import org.digitalsmile.gpio.pin.attributes.PinFlag;
+import org.digitalsmile.gpio.pin.attributes.PinState;
+import org.digitalsmile.gpio.pin.event.DetectedEvent;
 import org.digitalsmile.gpio.pin.event.PinEventProcessing;
-import org.digitalsmile.gpio.pin.structs.HandleDataStruct;
-import org.digitalsmile.gpio.pin.structs.HandleRequestStruct;
-import org.digitalsmile.gpio.pin.structs.LineInfoStruct;
+import org.digitalsmile.gpio.pin.structs.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.concurrent.*;
+import java.lang.foreign.MemorySegment;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Class for creating GPIO Pin object. It uses native FFM calls (such as open and ioctl) to operate with hardware.
  * Instance of Pin can only be created from {@link GPIOBoard} class, because we need to initialize GPIO device first and run some validations beforehand.
  */
-public final class Pin {
+public final class Pin implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(Pin.class);
     private static final StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
 
     private final String deviceName;
     private final int pin;
-    private final LineInfoStruct lineInfoStruct;
-    // executor services for event watcher
-    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    private static final ExecutorService eventTaskProcessor = Executors.newVirtualThreadPerTaskExecutor();
-    private Runnable watcher;
+    private final LineInfo lineInfo;
+    private final int fd;
+    private final PinDirection pinDirection;
 
-    private int fd;
-    private State state;
-    private Direction direction;
+    private static final ThreadFactory factory = Thread.ofVirtual().name("pin-event-detection-", 0).factory();
+    // executor services for event watcher
+    private static final ExecutorService eventTaskProcessor = Executors.newThreadPerTaskExecutor(factory);
+    private EventWatcher watcher;
+
+
+    private PinState pinState;
     private boolean closed = false;
 
     /**
      * Constructs GPIO Pin class from gpio device name, pin and direction (INPUT / OUTPUT).
      * Instance of Pin can only be created from {@link GPIOBoard} class, because we need to initialize GPIO device first and run some validations beforehand.
      *
-     * @param deviceName gpio device name
-     * @param gpioPin    pin gpio number
-     * @param direction  direction, e.g. write or read
-     * @throws NativeException if errors occurred during creating instance
+     * @param deviceName   gpio device name
+     * @param gpioPin      pin gpio number
+     * @param pinDirection direction, e.g. write or read
+     * @throws NativeMemoryException if errors occurred during creating instance
      */
-    public Pin(String deviceName, int gpioPin, Direction direction) throws NativeException {
+    public Pin(String deviceName, int gpioPin, PinDirection pinDirection) throws NativeMemoryException {
         if (!walker.getCallerClass().equals(GPIOBoard.class)) {
             throw new RuntimeException("Wrong call of constructor, Pin should be created by using GPIOBoard.ofPin(...) methods.");
         }
@@ -57,16 +69,24 @@ public final class Pin {
         this.pin = gpioPin;
         logger.info("{}-{} - setting up GPIO Pin...", deviceName, gpioPin);
         logger.debug("{}-{} - opening device file.", deviceName, gpioPin);
-        this.fd = FileDescriptor.open(deviceName, FileFlag.O_RDONLY | FileFlag.O_CLOEXEC);
-        var lineInfoStruct = LineInfoStruct.create(gpioPin);
+        var fd = FileDescriptor.open(deviceName, FileFlag.O_RDONLY | FileFlag.O_CLOEXEC);
+        var lineInfo = LineInfo.create(gpioPin);
         logger.debug("{}-{} - getting line info.", deviceName, gpioPin);
-        this.lineInfoStruct = IOCtl.call(fd, Command.getGpioGetLineInfoIoctl(), lineInfoStruct);
-        if ((lineInfoStruct.flags() & org.digitalsmile.gpio.pin.attributes.Flag.KERNEL.getValue()) > 0) {
+        this.lineInfo = IOCtl.call(fd, Command.getGpioV2GetLineInfoIoctl(), lineInfo);
+        if ((lineInfo.flags() & PinFlag.USED.getValue()) > 0) {
             close();
-            throw new RuntimeException("Pin " + pin + " is blocked by Kernel");
+            throw new RuntimeException("Pin " + pin + " is in use");
         }
-        setDirection(direction);
-        logger.info("{}-{} - GPIO Pin configured.", deviceName, gpioPin);
+        logger.info("{}-{} - GPIO Pin line info: {}", deviceName, gpioPin, lineInfo);
+        // if the direction is input we automatically add event detection to the pin for future use
+        var flags = pinDirection.equals(PinDirection.INPUT) ? (PinFlag.EDGE_FALLING.getValue() | PinFlag.EDGE_RISING.getValue()) : 0;
+        var lineConfig = new LineConfig(pinDirection.getMode() | flags, 0);
+        var lineRequest = LineRequest.create(new int[]{pin}, "org.digitalsmile.gpio", lineConfig);
+        var result = IOCtl.call(fd, Command.getGpioV2GetLineIoctl(), lineRequest);
+        this.fd = result.fd();
+
+        this.pinDirection = pinDirection;
+        logger.info("{}-{} - GPIO Pin configured: {}", deviceName, gpioPin, result);
     }
 
     /**
@@ -75,7 +95,7 @@ public final class Pin {
      * @return the name of pin from GPIO device
      */
     public String getName() {
-        return new String(lineInfoStruct.name());
+        return new String(lineInfo.name());
     }
 
     /**
@@ -92,8 +112,8 @@ public final class Pin {
      *
      * @return the pin state
      */
-    public State getState() {
-        return state;
+    public PinState getState() {
+        return pinState;
     }
 
     /**
@@ -101,86 +121,63 @@ public final class Pin {
      *
      * @return pin direction (INPUT / OUTPUT)
      */
-    public Direction getDirection() {
-        return direction;
-    }
-
-    /**
-     * Sets the direction of GPIO Pin.
-     *
-     * @param direction new direction for GPIO Pin
-     * @throws NativeException if errors occurred during direction change
-     */
-    public void setDirection(Direction direction) throws NativeException {
-        checkClosed();
-        if (direction.equals(this.direction)) {
-            logger.warn("{}-{} - direction {} is already set.", deviceName, pin, direction);
-            return;
-        }
-        logger.debug("{}-{} - setting direction to {}.", deviceName, pin, direction);
-        var gpioHandleRequest = HandleRequestStruct.createEmpty(pin, direction.getMode(), "org.digitalsmile.gpio");
-        var result = IOCtl.call(fd, Command.getGpioGetLineHandleIoctl(), gpioHandleRequest);
-        this.fd = result.fd();
-        this.direction = direction;
+    public PinDirection getDirection() {
+        return pinDirection;
     }
 
     /**
      * Closes the GPIO Pin. Object must be recreated if you have to use it after.
      *
-     * @throws NativeException if errors occurred during closing file descriptor
+     * @throws NativeMemoryException if errors occurred during closing file descriptor
      */
-    public void close() throws NativeException {
+    @Override
+    public void close() throws NativeMemoryException {
         logger.info("{}-{} - closing GPIO Pin.", deviceName, pin);
         FileDescriptor.close(fd);
-        executorService.close();
         this.watcher = null;
         this.closed = true;
-        logger.info("{}-{} - GPIO Pin is closed. Recreate the pin object to reuse.", deviceName, pin);
+        logger.debug("{}-{} - GPIO Pin is closed. Recreate the pin object to reuse.", deviceName, pin);
     }
 
     /**
      * Reads the state of GPIO Pin.
      *
      * @return the state of GPIO Pin
-     * @throws NativeException if errors occurred during reading the state
+     * @throws NativeMemoryException if errors occurred during reading the state
      */
-    public State read() throws NativeException {
+    public PinState read() throws NativeMemoryException {
         checkClosed();
-        checkDirection();
-        if (Direction.OUTPUT.equals(this.direction)) {
-            throw new RuntimeException("Can't read from output pin " + new String(lineInfoStruct.name()) + ". The direction is set to output");
-        }
         logger.trace("{}-{} - reading GPIO Pin.", deviceName, pin);
-        var gpioHandleData = HandleDataStruct.createEmpty();
-        var result = IOCtl.call(fd, Command.getGpioHandleGetLineValuesIoctl(), gpioHandleData);
-        this.state = result.values()[0] == 1 ? State.HIGH : State.LOW;
-        logger.trace("{}-{} - new GPIO Pin state is {}.", deviceName, pin, state);
-        return state;
+        var lineValues = new LineValues(0, 1);
+        var result = IOCtl.call(fd, Command.getGpioV2GetValuesIoctl(), lineValues);
+        this.pinState = result.bits() == 1 ? PinState.HIGH : PinState.LOW;
+        logger.trace("{}-{} - new GPIO Pin state is {}.", deviceName, pin, pinState);
+        return pinState;
     }
 
     /**
      * Writes the state to GPIO Pin.
      *
-     * @param state the state to be written
-     * @throws NativeException if errors occurred during writing new state
+     * @param pinState the state to be written
+     * @throws NativeMemoryException if errors occurred during writing new state
      */
-    public void write(State state) throws NativeException {
+    public void write(PinState pinState) throws NativeMemoryException {
         checkClosed();
         checkDirection();
-        if (Direction.INPUT.equals(this.direction)) {
-            throw new RuntimeException("Can't write to input pin " + new String(lineInfoStruct.name()) + ". The direction is set to input.");
+        if (PinDirection.INPUT.equals(this.pinDirection)) {
+            throw new RuntimeException("Can't write to input pin " + new String(lineInfo.name()) + ". The direction is set to input.");
         }
-        logger.trace("{}-{} - setting GPIO Pin to state {}.", deviceName, pin, state);
-        var gpioHandleData = HandleDataStruct.create(state.getValue());
-        IOCtl.call(fd, Command.getGpioHandleSetLineValuesIoctl(), gpioHandleData);
-        this.state = state;
+        logger.trace("{}-{} - setting GPIO Pin to state {}.", deviceName, pin, pinState);
+        var lineValues = new LineValues(pinState.getValue(), 1);
+        IOCtl.call(fd, Command.getGpioV2SetValuesIoctl(), lineValues);
+        this.pinState = pinState;
     }
 
     /**
      * Checks if direction is explicitly set.
      */
     private void checkDirection() {
-        if (direction == null) {
+        if (pinDirection == null) {
             throw new RuntimeException("Pin " + pin + " direction not set");
         }
     }
@@ -195,22 +192,65 @@ public final class Pin {
     }
 
     /**
-     * Adds event detection listener, see {@link Event}.
+     * Adds default event detection listener with buffer size of 1.
+     * WARNING: since the caller of this callback is heavily tight with linux poll, it is recommended to do processing as fast as possible in implementation part.
+     * If there is any heavy processing call it is recommended to offload it into different thread.
      *
-     * @param event          the event to detect
+     * @param pinEvent       the event to detect
      * @param eventProcessor event processor callback
      * @return future to operate the task
-     * @throws IOException if watcher is already set for the GPIO Pin
      */
-    public ScheduledFuture<?> addEventDetection(Event event, PinEventProcessing eventProcessor) throws IOException {
-        if (watcher != null) {
-            throw new IOException("Watcher is already set for " + pin + ". " + watcher);
+    public Future<?> startEventDetection(PinEvent pinEvent, PinEventProcessing eventProcessor) {
+        return startEventDetection(pinEvent, eventProcessor, 1);
+    }
+
+    /**
+     * Adds event detection listener with given event buffer size.
+     * When number of events reaches event buffer size, event processor is called.
+     * WARNING: since the caller of this callback is heavily tight with linux poll, it is recommended to do processing as fast as possible in implementation part.
+     * If there is any heavy processing call it is recommended to offload it into different thread.
+     *
+     * @param pinEvent        the event to detect
+     * @param eventProcessor  event processor callback
+     * @param eventBufferSize size of event buffer to be processed
+     * @return future to operate the task
+     */
+    public Future<?> startEventDetection(PinEvent pinEvent, PinEventProcessing eventProcessor, int eventBufferSize) {
+        if (watcher.isRunning()) {
+            logger.error("{}-{} - cannot start event detection, the watcher thread is already running.", deviceName, pin);
+            return null;
         }
-        logger.info("{}-{} - adding event {} detection.", deviceName, pin, event);
-        this.watcher = new EventWatcher(event, eventProcessor);
-        return executorService.scheduleAtFixedRate(() -> {
-            eventTaskProcessor.execute(watcher);
-        }, 0, 10, TimeUnit.NANOSECONDS);
+        logger.info("{}-{} - adding event {} detection with buffer size {}.", deviceName, pin, pinEvent, eventBufferSize);
+        this.watcher = new EventWatcher(fd, pinEvent, eventProcessor, eventBufferSize);
+        return eventTaskProcessor.submit(watcher);
+    }
+
+    /**
+     * Adds event detection listener with given update period.
+     * All detected events will be pushed to processing with a period specified in update period. The default event buffer size will be set to 16, according to GPIO default buffer size.
+     * WARNING: since the caller of this callback is heavily tight with linux poll, it is recommended to do processing as fast as possible in implementation part.
+     * If there is any heavy processing call it is recommended to offload it into different thread.
+     *
+     * @param pinEvent       the event to detect
+     * @param eventProcessor event processor callback
+     * @param updatePeriod   update period
+     * @return future to operate the task
+     */
+    public Future<?> startEventDetection(PinEvent pinEvent, PinEventProcessing eventProcessor, Duration updatePeriod) {
+        if (watcher.isRunning()) {
+            logger.error("{}-{} - cannot start event detection, the watcher thread is already running.", deviceName, pin);
+            return null;
+        }
+        logger.info("{}-{} - adding event {} detection with pulse delay {}.", deviceName, pin, pinEvent, updatePeriod);
+        this.watcher = new EventWatcher(fd, pinEvent, eventProcessor, updatePeriod);
+        return eventTaskProcessor.submit(watcher);
+    }
+
+    /**
+     * Stops event detection on pin.
+     */
+    public void stopEventDetection() {
+        this.watcher.stopWatching();
     }
 
     @Override
@@ -218,8 +258,8 @@ public final class Pin {
         return "GPIOPin{" +
                 "deviceName='" + deviceName + '\'' +
                 ", pin=" + pin +
-                ", state=" + state +
-                ", direction=" + direction +
+                ", state=" + pinState +
+                ", direction=" + pinDirection +
                 ", closed=" + closed +
                 '}';
     }
@@ -227,68 +267,129 @@ public final class Pin {
     /**
      * Internal class for watching the event on GPIO Pin.
      */
-    private class EventWatcher implements Runnable {
+    private static class EventWatcher implements Runnable {
         private static final Logger logger = LoggerFactory.getLogger(EventWatcher.class);
 
-        private final Event event;
+        private final int fd;
+        private final PinEvent pinEvent;
         private final PinEventProcessing eventProcessor;
+        private final int eventBufferSize;
+        private final Duration updatePeriod;
 
-        private State currentState;
+        private boolean stopWatching = false;
 
         /**
          * Constructs the EventWatcher
          *
-         * @param event          event
-         * @param eventProcessor event processor
+         * @param pinEvent        event
+         * @param eventProcessor  event processor
+         * @param eventBufferSize event buffer size
          */
-        EventWatcher(Event event, PinEventProcessing eventProcessor) {
-            this.event = event;
+        EventWatcher(int fd, PinEvent pinEvent, PinEventProcessing eventProcessor, int eventBufferSize) {
+            this.fd = fd;
+            this.pinEvent = pinEvent;
             this.eventProcessor = eventProcessor;
-            if (event.equals(Event.FALLING)) {
-                currentState = State.HIGH;
-            } else if (event.equals(Event.RISING)) {
-                currentState = State.LOW;
-            } else {
-                currentState = State.LOW;
-            }
+            this.eventBufferSize = eventBufferSize;
+            this.updatePeriod = Duration.ZERO;
+        }
+
+        /**
+         * Constructs the EventWatcher
+         *
+         * @param pinEvent       event
+         * @param eventProcessor event processor
+         * @param updatePeriod   update period
+         */
+        EventWatcher(int fd, PinEvent pinEvent, PinEventProcessing eventProcessor, Duration updatePeriod) {
+            this.fd = fd;
+            this.pinEvent = pinEvent;
+            this.eventProcessor = eventProcessor;
+            this.eventBufferSize = 1;
+            this.updatePeriod = updatePeriod;
         }
 
         @Override
         public void run() {
-            try {
-                var newState = read();
-                switch (event) {
-                    case RISING -> {
-                        if (newState.equals(State.HIGH) && currentState.equals(State.LOW)) {
-                            logger.trace("{}-{} - detected event {}: new state is {}.", deviceName, pin, event, newState);
-                            eventProcessor.process(newState);
+            var pollFd = new PollingData(fd, (short) (PollFlag.POLLIN | PollFlag.POLLERR), (short) 0);
+            var eventSize = (int) LineEvent.LAYOUT.byteSize();
+            var timestamp = Instant.now();
+            List<DetectedEvent> eventList = new ArrayList<>();
+            while (!stopWatching) {
+                try {
+                    // number of file descriptors is set to 1, since we are polling only one pin
+                    // timeout is set to 25s for default
+                    var retPollFd = Poll.poll(pollFd, 1, updatePeriod.equals(Duration.ZERO) ? 25_000 : (int) updatePeriod.toMillis());
+                    if (retPollFd == null) {
+                        // timeout happened, process all left events, update timestamp
+                        eventProcessor.process(eventList);
+                        eventList.clear();
+                        timestamp = Instant.now();
+                        continue;
+                    }
+                    if ((retPollFd.revents() & (PollFlag.POLLIN)) != 0) {
+                        // default minimum buffer size is 16 line events
+                        // see https://elixir.bootlin.com/linux/latest/source/include/uapi/linux/gpio.h#L185
+                        var buf = FileDescriptor.read(fd, 16 * eventSize);
+                        var holder = new byte[eventSize];
+                        for (int i = 0; i < 16 * LineEvent.LAYOUT.byteSize(); i += eventSize) {
+                            // check if timestamp is 0, then there is no event present, we can skip
+                            if (buf[i] == 0) {
+                                continue;
+                            }
+                            System.arraycopy(buf, i, holder, 0, eventSize);
+                            var memoryBuffer = MemorySegment.ofArray(holder);
+                            var event = LineEvent.createEmpty().fromBytes(memoryBuffer);
+                            // process only interested events
+                            if ((event.id() & this.pinEvent.getValue()) != 0) {
+                                eventList.add(new DetectedEvent(event.timestampNs(), PinEvent.getByValue(event.id()), event.lineSeqNo()));
+                            }
+                        }
+                        if (eventList.size() >= eventBufferSize && updatePeriod.equals(Duration.ZERO)) {
+                            // process by number of events
+                            eventProcessor.process(eventList);
+                            eventList.clear();
+                        } else if (timestamp.plus(updatePeriod).isBefore(Instant.now())) {
+                            // process by update period
+                            eventProcessor.process(eventList);
+                            eventList.clear();
+                            timestamp = Instant.now();
                         }
                     }
-                    case FALLING -> {
-                        if (newState.equals(State.LOW) && currentState.equals(State.HIGH)) {
-                            logger.trace("{}-{} - detected event {}: new state is {}.", deviceName, pin, event, newState);
-                            eventProcessor.process(newState);
-                        }
+                    if ((retPollFd.revents() & (PollFlag.POLLERR)) != 0) {
+                        // internal error on polling
+                        logger.error("Internal error during polling");
+                        stopWatching();
                     }
-                    case BOTH -> {
-                        if (!currentState.equals(newState)) {
-                            logger.trace("{}-{} - detected event {}: new state is {}.", deviceName, pin, event, newState);
-                            eventProcessor.process(newState);
-                        }
-                    }
+                } catch (Throwable e) {
+                    throw new RuntimeException(e);
                 }
-                currentState = newState;
-            } catch (NativeException e) {
-                logger.error("{}-{} - error while watching for event {}.", deviceName, pin, event);
-                logger.error(e.getMessage());
             }
+        }
+
+        /**
+         * Stops event watcher, end the task.
+         */
+        public void stopWatching() {
+            this.stopWatching = true;
+        }
+
+        /**
+         * Checks if the event watcher is running.
+         *
+         * @return true if event watcher is running
+         */
+        public boolean isRunning() {
+            return !this.stopWatching;
         }
 
         @Override
         public String toString() {
             return "EventWatcher{" +
-                    "event=" + event +
-                    ", eventProcessor=" + eventProcessor +
+                    "fd=" + fd +
+                    ", pinEvent=" + pinEvent +
+                    ", eventBufferSize=" + eventBufferSize +
+                    ", updatePeriod=" + updatePeriod +
+                    ", stopWatching=" + stopWatching +
                     '}';
         }
     }

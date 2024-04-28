@@ -1,16 +1,20 @@
 package org.digitalsmile.gpio.pwm;
 
 import org.digitalsmile.gpio.GPIOBoard;
-import org.digitalsmile.gpio.core.exception.NativeException;
+import org.digitalsmile.gpio.NativeMemoryException;
 import org.digitalsmile.gpio.core.file.FileDescriptor;
 import org.digitalsmile.gpio.core.file.FileFlag;
-import org.digitalsmile.gpio.pwm.attributes.Polarity;
+import org.digitalsmile.gpio.pwm.attributes.PWMPolarity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Class for creating PWMBus object through sysfs. It uses native FFM calls (such as open/close/read/write) to operate with hardware.
+ * Instance of PWMBus can only be created from {@link GPIOBoard} class, because we need to initialize GPIO device first and run some validations beforehand.
+ */
 public final class PWMBus {
     private static final Logger logger = LoggerFactory.getLogger(PWMBus.class);
     private static final StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
@@ -35,36 +39,43 @@ public final class PWMBus {
     private final String pwmPath;
 
     private boolean enabled;
-    private int dutyCycle;
-    private int period;
-    private Polarity polarity;
+    private long dutyCycle;
+    private long period;
+    private PWMPolarity pwmPolarity;
 
     private int frequency;
     private int speed;
 
-    public PWMBus(int pwmChipNumber, int pwmBusNumber) throws NativeException {
+    /**
+     * Creates PWMus instance with given PWM chip number and bus number.
+     *
+     * @param pwmChipNumber PWM chip number, located at sysfs
+     * @param pwmBusNumber  PWM Bus number, located at sysfs
+     * @throws NativeMemoryException if errors occurred during creating instance
+     */
+    public PWMBus(int pwmChipNumber, int pwmBusNumber) throws NativeMemoryException {
         if (!walker.getCallerClass().equals(GPIOBoard.class)) {
             throw new RuntimeException("Wrong call of constructor, PWMBus should be created by using GPIOBoard.ofPWMBus(...) methods.");
         }
 
         var pwmChipFile = Path.of(CHIP_PATH + pwmChipNumber).toFile();
         if (!pwmChipFile.exists()) {
-            throw new IllegalArgumentException("Chip at path '" + pwmChipFile.getPath() + "' does not exist!");
+            throw new IllegalArgumentException("PWM Chip at path '" + pwmChipFile.getPath() + "' does not exist!");
         }
         var pwmFile = Path.of(pwmChipFile.getPath() + PWM_PATH + pwmBusNumber).toFile();
         if (!pwmFile.exists()) {
-            logger.warn("{} - no pwm found... will try to export chip first.", pwmFile);
+            logger.warn("{} - no PWM Bus found... will try to export PWM Bus first.", pwmFile);
             var npwmFd = FileDescriptor.open(pwmChipFile.getPath() + CHIP_NPWM_PATH, FileFlag.O_RDONLY);
-            var channels = getIntegerContent(FileDescriptor.read(npwmFd, MAX_FILE_SIZE));
+            var maxChannel = getIntegerContent(FileDescriptor.read(npwmFd, MAX_FILE_SIZE));
             FileDescriptor.close(npwmFd);
-            if (pwmBusNumber > channels - 1) {
-                throw new IllegalArgumentException("PWM at path '" + pwmFile.getPath() + "' cannot be exported!");
+            if (pwmBusNumber > maxChannel - 1) {
+                throw new IllegalArgumentException("PWM Bus at path '" + pwmFile.getPath() + "' cannot be exported! Max available channel is " + maxChannel);
             }
             var exportFd = FileDescriptor.open(pwmChipFile.getPath() + CHIP_EXPORT_PATH, FileFlag.O_WRONLY);
-            FileDescriptor.write(exportFd, String.valueOf(pwmBusNumber).getBytes());
+            FileDescriptor.write(exportFd, String.valueOf(pwmBusNumber));
             FileDescriptor.close(exportFd);
             if (!pwmFile.exists()) {
-                throw new IllegalArgumentException("PWM at path '" + pwmFile.getPath() + "' cannot be exported!");
+                throw new IllegalArgumentException("PWM Bus at path '" + pwmFile.getPath() + "' cannot be exported!");
             }
         }
         this.pwmPath = pwmFile.getPath();
@@ -77,28 +88,50 @@ public final class PWMBus {
         this.enabled = getIntegerContent(FileDescriptor.read(enableFd, MAX_FILE_SIZE)) == 1;
         this.dutyCycle = getIntegerContent(FileDescriptor.read(dutyCycleFd, MAX_FILE_SIZE));
         this.period = getIntegerContent(FileDescriptor.read(periodFd, MAX_FILE_SIZE));
-        this.polarity = Polarity.getPolarityByString(new String(FileDescriptor.read(polarityFd, MAX_FILE_SIZE)).trim());
+        this.pwmPolarity = PWMPolarity.getPolarityByString(new String(FileDescriptor.read(polarityFd, MAX_FILE_SIZE)).trim());
 
         FileDescriptor.close(enableFd);
         FileDescriptor.close(dutyCycleFd);
         FileDescriptor.close(periodFd);
         FileDescriptor.close(polarityFd);
 
-        logger.info("{} - pwm setup finished. Initial state: {}", this.pwmPath, this);
+        logger.info("{} - pwm setup finished. Initial state: {}", pwmPath, this);
     }
 
-    public void configure(int frequency, int speed) throws NativeException {
+    /**
+     * Configures PWM Bus with given frequency and speed.
+     *
+     * @param frequency frequency in hertz
+     * @param speed     rotation speed from 0 to 100%
+     * @throws NativeMemoryException if any error occurred during configuration
+     */
+    public void configure(int frequency, int speed) throws NativeMemoryException {
         logger.info("{} - setting frequency to {}Hz, speed to {}%.", pwmPath, frequency, speed);
         configureInternal(frequency, speed);
     }
 
-    public void configure(int frequency, int speed, Polarity polarity) throws NativeException {
-        logger.info("{} - setting frequency to {}Hz, speed to {}% and polarity to {}.", pwmPath, frequency, speed, polarity);
+    /**
+     * Configures PWM Bus with given frequency, speed and polarity.
+     *
+     * @param frequency   frequency in hertz
+     * @param speed       rotation speed from 0 to 100%
+     * @param pwmPolarity polarity of PWM (normal or inversed)
+     * @throws NativeMemoryException if any error occurred during configuration
+     */
+    public void configure(int frequency, int speed, PWMPolarity pwmPolarity) throws NativeMemoryException {
+        logger.info("{} - setting frequency to {}Hz, speed to {}% and polarity to {}.", pwmPath, frequency, speed, pwmPolarity);
         configureInternal(frequency, speed);
-        setPolarity(polarity);
+        setPolarity(pwmPolarity);
     }
 
-    private void configureInternal(int frequency, int speed) throws NativeException {
+    /**
+     * Internal method for configuring PWM Bus.
+     *
+     * @param frequency frequency in hertz
+     * @param speed     rotation speed from 0 to 100%
+     * @throws NativeMemoryException if any error occurred during configuration
+     */
+    private void configureInternal(int frequency, int speed) throws NativeMemoryException {
         if (frequency < 0) {
             logger.error("{} - cannot set frequency '{}', required more then 0.", pwmPath, frequency);
             return;
@@ -124,11 +157,19 @@ public final class PWMBus {
 
         FileDescriptor.close(dutyCycleFd);
         FileDescriptor.close(periodFd);
+
+        this.period = period;
+        this.dutyCycle = dutyCycle;
     }
 
-    public void enable() throws NativeException {
+    /**
+     * Enables PWM Bus and start wave generation.
+     *
+     * @throws NativeMemoryException if any error occurred
+     */
+    public void enable() throws NativeMemoryException {
         if (enabled) {
-            logger.warn("{} - PWM is already enabled.", pwmPath);
+            logger.warn("{} - PWM Bus is already enabled.", pwmPath);
             return;
         }
         checkPeriodNotZero();
@@ -138,9 +179,14 @@ public final class PWMBus {
         this.enabled = true;
     }
 
-    public void disable() throws NativeException {
+    /**
+     * Disables PWM Bus and stops wave generation.
+     *
+     * @throws NativeMemoryException if any error occurred
+     */
+    public void disable() throws NativeMemoryException {
         if (!enabled) {
-            logger.warn("{} - PWM is already disabled.", pwmPath);
+            logger.warn("{} - PWM Bus is already disabled.", pwmPath);
             return;
         }
         var enableFd = FileDescriptor.open(this.pwmPath + ENABLE_PATH);
@@ -149,10 +195,15 @@ public final class PWMBus {
         this.enabled = false;
     }
 
-
-    public void setPolarity(Polarity polarity) throws NativeException {
-        if (this.polarity.equals(polarity)) {
-            logger.warn("{} - polarity is already set to {}.", pwmPath, polarity);
+    /**
+     * Sets the polarity of PWM Bus.
+     *
+     * @param pwmPolarity polarity of PWM Bus
+     * @throws NativeMemoryException if any error occurred
+     */
+    public void setPolarity(PWMPolarity pwmPolarity) throws NativeMemoryException {
+        if (this.pwmPolarity.equals(pwmPolarity)) {
+            logger.warn("{} - polarity is already set to {}.", pwmPath, pwmPolarity);
             return;
         }
         if (this.enabled) {
@@ -160,47 +211,90 @@ public final class PWMBus {
                     "You should run disable() and then enable() to take effect!", pwmPath);
         }
         checkPeriodNotZero();
-        logger.info("{} - changing polarity to {}", pwmPath, polarity);
+        logger.info("{} - changing polarity to {}", pwmPath, pwmPolarity);
         var polarityFd = FileDescriptor.open(this.pwmPath + POLARITY_PATH, FileFlag.O_WRONLY);
-        FileDescriptor.write(polarityFd, polarity.getPolarity().getBytes());
+        FileDescriptor.write(polarityFd, pwmPolarity.getPolarity().getBytes());
         FileDescriptor.close(polarityFd);
-        this.polarity = polarity;
+        this.pwmPolarity = pwmPolarity;
     }
 
-    public void setSpeed(int speed) throws NativeException {
+    /**
+     * Sets rotation speed of PWM Bus.
+     *
+     * @param speed rotation speed from 0 to 100%
+     * @throws NativeMemoryException if any error occurred
+     */
+    public void setSpeed(int speed) throws NativeMemoryException {
         checkPeriodNotZero();
         logger.info("{} - setting speed to {}%.", pwmPath, speed);
         configureInternal(frequency, speed);
     }
 
-    public void setFrequency(int frequency) throws NativeException {
+    /**
+     * Sets frequency of PWM Bus.
+     *
+     * @param frequency frequency in hertz
+     * @throws NativeMemoryException if any error occurred
+     */
+    public void setFrequency(int frequency) throws NativeMemoryException {
         logger.info("{} - setting frequency to {}Hz.", pwmPath, frequency);
         configureInternal(frequency, speed);
     }
 
-    public Polarity getPolarity() {
-        return polarity;
+    /**
+     * Gets PWM Bus polarity.
+     *
+     * @return PWM Bus polarity
+     */
+    public PWMPolarity getPolarity() {
+        return pwmPolarity;
     }
 
+    /**
+     * Checks if PWM Bus is enabled.
+     *
+     * @return true if PWM Bus is enabled
+     */
     public boolean isEnabled() {
         return enabled;
     }
 
+    /**
+     * Gets rotation speed of PWM Bus.
+     *
+     * @return rotation speed
+     */
     public int getSpeed() {
         return speed;
     }
 
+    /**
+     * Gets frequency of PWM Bus.
+     *
+     * @return frequency of PWM Bus
+     */
     public int getFrequency() {
         return frequency;
     }
 
-    private void checkPeriodNotZero() throws NativeException {
+    /**
+     * Checks if frequency is zero.
+     *
+     * @throws NativeMemoryException if frequency is zero
+     */
+    private void checkPeriodNotZero() throws NativeMemoryException {
         if (this.frequency == 0) {
             logger.error("{} - frequency is 0, please specify the working PWM frequency first.", pwmPath);
-            throw new NativeException("Frequency is not specified!");
+            throw new NativeMemoryException("Frequency is not specified!");
         }
     }
 
+    /**
+     * Since read/write of file descriptors accepts only byte arrays / text, we have to convert inputs from text bytes to numbers.
+     *
+     * @param bytes text byte array to be converted
+     * @return integer representation of text byte array
+     */
     private static int getIntegerContent(byte[] bytes) {
         return Integer.parseInt(new String(bytes).trim());
     }
@@ -211,7 +305,7 @@ public final class PWMBus {
                 " enabled=" + enabled +
                 ", dutyCycle=" + dutyCycle +
                 ", period=" + period +
-                ", polarity='" + polarity + '\'' +
+                ", polarity='" + pwmPolarity + '\'' +
                 '}';
     }
 }

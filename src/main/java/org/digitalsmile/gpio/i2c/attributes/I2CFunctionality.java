@@ -3,7 +3,7 @@ package org.digitalsmile.gpio.i2c.attributes;
 /**
  * Functionalities available on the device.
  */
-public enum Functionality {
+public enum I2CFunctionality {
     /**
      * Plain i2c-level commands
      * (Pure SMBus adapters typically can not do these)
@@ -157,7 +157,7 @@ public enum Functionality {
      *
      * @param value byte value of functionality
      */
-    Functionality(int value) {
+    I2CFunctionality(int value) {
         this.value = value;
     }
 
@@ -166,8 +166,8 @@ public enum Functionality {
      *
      * @param func byte values of functionality
      */
-    Functionality(Functionality... func) {
-        for (Functionality item : func) {
+    I2CFunctionality(I2CFunctionality... func) {
+        for (I2CFunctionality item : func) {
             value = value | item.value;
         }
     }

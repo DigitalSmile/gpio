@@ -5,7 +5,7 @@ package org.digitalsmile.gpio.spi.attributes;
  *
  * @see <a href="https://en.wikipedia.org/wiki/Serial_Peripheral_Interface#Mode_numbers">SPI Modes on wikipedia</a>
  */
-public enum Mode {
+public enum SPIMode {
     /**
      * CPOL = 0
      * CPHA = 0
@@ -34,7 +34,7 @@ public enum Mode {
      *
      * @param value integer value of SPI Mode
      */
-    Mode(int value) {
+    SPIMode(int value) {
         this.value = value;
     }
 
@@ -53,7 +53,7 @@ public enum Mode {
      * @param value given integer value of spi mode
      * @return spi mode
      */
-    public static Mode getSPIMode(int value) {
+    public static SPIMode getSPIMode(int value) {
         return switch (value) {
             case 0 -> MODE_0;
             case 0x01 -> MODE_1;

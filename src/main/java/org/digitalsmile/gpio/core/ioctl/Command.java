@@ -15,9 +15,6 @@ public final class Command {
         return Internals.GPIO_GET_CHIPINFO_IOCTL;
     }
 
-    public static long getGpioGetLineInfoIoctl() {
-        return Internals.GPIO_GET_LINEINFO_IOCTL;
-    }
 
     public static long getSpiIocRdMode() {
         return Internals.SPI_IOC_RD_MODE;
@@ -59,20 +56,21 @@ public final class Command {
         return Internals.SPI_IOC_WR_LSB_FIRST;
     }
 
-    public static long getGpioGetLineHandleIoctl() {
-        return Internals.GPIO_GET_LINEHANDLE_IOCTL;
+
+    public static long getGpioV2GetLineInfoIoctl() {
+        return Internals.GPIO_V2_GET_LINEINFO_IOCTL;
     }
 
-    public static long getGpioGetLineeventIoctl() {
-        return Internals.GPIO_GET_LINEEVENT_IOCTL;
+    public static long getGpioV2GetLineIoctl() {
+        return Internals.GPIO_V2_GET_LINE_IOCTL;
     }
 
-    public static long getGpioHandleGetLineValuesIoctl() {
-        return Internals.GPIOHANDLE_GET_LINE_VALUES_IOCTL;
+    public static long getGpioV2GetValuesIoctl() {
+        return Internals.GPIO_V2_LINE_GET_VALUES_IOCTL;
     }
 
-    public static long getGpioHandleSetLineValuesIoctl() {
-        return Internals.GPIOHANDLE_SET_LINE_VALUES_IOCTL;
+    public static long getGpioV2SetValuesIoctl() {
+        return Internals.GPIO_V2_LINE_SET_VALUES_IOCTL;
     }
 
     public static long getI2CSlave() {

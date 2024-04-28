@@ -1,11 +1,11 @@
 package org.digitalsmile.gpio.spi;
 
 import org.digitalsmile.gpio.GPIOBoard;
-import org.digitalsmile.gpio.core.exception.NativeException;
+import org.digitalsmile.gpio.NativeMemoryException;
 import org.digitalsmile.gpio.core.file.FileDescriptor;
 import org.digitalsmile.gpio.core.ioctl.Command;
 import org.digitalsmile.gpio.core.ioctl.IOCtl;
-import org.digitalsmile.gpio.spi.attributes.Mode;
+import org.digitalsmile.gpio.spi.attributes.SPIMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,7 +18,7 @@ public final class SPIBus {
     private static final StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
 
     private final String path;
-    private Mode mode;
+    private SPIMode SPIMode;
     private int clockFrequency;
     private int byteLength;
     private int bitOrdering;
@@ -32,18 +32,18 @@ public final class SPIBus {
      *
      * @param spiPath        path to SPI bus device
      * @param busNumber      bus number
-     * @param mode           SPI mode to be configured
+     * @param SPIMode           SPI mode to be configured
      * @param clockFrequency desired clock frequency of SPI bus
      * @param byteLength     byte length to be configured (usually 8)
      * @param bitOrdering    bit ordering in the byte
-     * @throws NativeException if errors occurred during creating instance
+     * @throws NativeMemoryException if errors occurred during creating instance
      */
-    public SPIBus(String spiPath, int busNumber, Mode mode, int clockFrequency, int byteLength, int bitOrdering) throws NativeException {
+    public SPIBus(String spiPath, int busNumber, SPIMode SPIMode, int clockFrequency, int byteLength, int bitOrdering) throws NativeMemoryException {
         if (!walker.getCallerClass().equals(GPIOBoard.class)) {
             throw new RuntimeException("Wrong call of constructor, SPIBus should be created by using GPIOBoard.ofSPI(...) methods.");
         }
         this.path = spiPath + busNumber;
-        this.mode = mode;
+        this.SPIMode = SPIMode;
         this.clockFrequency = clockFrequency;
         this.byteLength = byteLength;
         this.bitOrdering = bitOrdering;
@@ -78,9 +78,9 @@ public final class SPIBus {
      * Sets the new clock frequency of SPI Bus and reinitialize the device.
      *
      * @param clockFrequency new clock frequency to SPI Bus
-     * @throws NativeException if errors occurred during reinitializing
+     * @throws NativeMemoryException if errors occurred during reinitializing
      */
-    public void setClockFrequency(int clockFrequency) throws NativeException {
+    public void setClockFrequency(int clockFrequency) throws NativeMemoryException {
         this.clockFrequency = clockFrequency;
         logger.info("{} - clock frequency changed, reinitialize SPIBus...", path);
         init();
@@ -91,18 +91,18 @@ public final class SPIBus {
      *
      * @return the SPI Bus mode
      */
-    public Mode getSPIMode() {
-        return mode;
+    public SPIMode getSPIMode() {
+        return SPIMode;
     }
 
     /**
      * Sets the new SPI mode of SPI Bus and reinitialize the device.
      *
-     * @param mode new SPI mode
-     * @throws NativeException if errors occurred during reinitializing
+     * @param SPIMode new SPI mode
+     * @throws NativeMemoryException if errors occurred during reinitializing
      */
-    public void setSPIMode(Mode mode) throws NativeException {
-        this.mode = mode;
+    public void setSPIMode(SPIMode SPIMode) throws NativeMemoryException {
+        this.SPIMode = SPIMode;
         logger.info("{} - spi mode changed, reinitialize SPIBus...", path);
         init();
     }
@@ -120,9 +120,9 @@ public final class SPIBus {
      * Sets the new byte length of SPI Bus and reinitialize the device.
      *
      * @param byteLength new byte length
-     * @throws NativeException if errors occurred during reinitializing
+     * @throws NativeMemoryException if errors occurred during reinitializing
      */
-    public void setByteLength(int byteLength) throws NativeException {
+    public void setByteLength(int byteLength) throws NativeMemoryException {
         this.byteLength = byteLength;
         logger.info("{} - byte length changed, reinitialize SPIBus...", path);
         init();
@@ -141,9 +141,9 @@ public final class SPIBus {
      * Sets the new bit ordering of SPI Bus and reinitialize the device.
      *
      * @param bitOrdering new bit ordering
-     * @throws NativeException if errors occurred during reinitializing
+     * @throws NativeMemoryException if errors occurred during reinitializing
      */
-    public void setBitOrdering(int bitOrdering) throws NativeException {
+    public void setBitOrdering(int bitOrdering) throws NativeMemoryException {
         this.bitOrdering = bitOrdering;
         logger.info("{} - bit ordering changed, reinitialize SPIBus...", path);
         init();
@@ -152,12 +152,12 @@ public final class SPIBus {
     /**
      * Initialize the SPI Bus.
      *
-     * @throws NativeException if errors occurred during initialization
+     * @throws NativeMemoryException if errors occurred during initialization
      */
-    public void init() throws NativeException {
+    public void init() throws NativeMemoryException {
         checkClosed();
-        logger.debug("{} - setting SPI Mode to {}.", path, mode);
-        IOCtl.call(spiFileDescriptor, Command.getSpiIocWrMode(), mode.getValue());
+        logger.debug("{} - setting SPI Mode to {}.", path, SPIMode);
+        IOCtl.call(spiFileDescriptor, Command.getSpiIocWrMode(), SPIMode.getValue());
         logger.debug("{} - setting Bit Ordering to {}.", path, bitOrdering);
         IOCtl.call(spiFileDescriptor, Command.getSpiIocWrLsbFirst(), bitOrdering);
         logger.debug("{} - setting Byte Length to {}.", path, byteLength);
@@ -172,9 +172,9 @@ public final class SPIBus {
      * @param data          data to be sent to bus
      * @param immediateRead indicates if we should immediately read from bus after writing
      * @return byte array with data or zero length byte array (if no immediate read)
-     * @throws NativeException if error occurred during writing the SPI Bus
+     * @throws NativeMemoryException if error occurred during writing the SPI Bus
      */
-    public byte[] sendByteData(byte[] data, boolean immediateRead) throws NativeException {
+    public byte[] sendByteData(byte[] data, boolean immediateRead) throws NativeMemoryException {
         checkClosed();
         logger.trace("{} - writing data {}.", path, data);
         FileDescriptor.write(spiFileDescriptor, data);
@@ -188,9 +188,9 @@ public final class SPIBus {
     /**
      * Closes the SPI Bus. Object must be recreated if used after closing.
      *
-     * @throws NativeException if error occurred during closing the SPI Bus
+     * @throws NativeMemoryException if error occurred during closing the SPI Bus
      */
-    public void close() throws NativeException {
+    public void close() throws NativeMemoryException {
         logger.info("{} - closing SPIBus.", path);
         FileDescriptor.close(spiFileDescriptor);
         this.closed = true;
@@ -210,7 +210,7 @@ public final class SPIBus {
     public String toString() {
         return "SPIBus{" +
                 "path='" + path + '\'' +
-                ", spiMode=" + mode +
+                ", spiMode=" + SPIMode +
                 ", clockFrequency=" + clockFrequency +
                 ", byteLength=" + byteLength +
                 ", bitOrdering=" + bitOrdering +

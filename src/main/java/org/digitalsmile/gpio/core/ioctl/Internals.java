@@ -1,5 +1,10 @@
 package org.digitalsmile.gpio.core.ioctl;
 
+import org.digitalsmile.gpio.pin.structs.LineConfig;
+import org.digitalsmile.gpio.pin.structs.LineInfo;
+import org.digitalsmile.gpio.pin.structs.LineRequest;
+import org.digitalsmile.gpio.pin.structs.LineValues;
+
 /**
  * Internal reference file from Kernel headers to calculate ioctl commands.
  */
@@ -20,12 +25,14 @@ final class Internals {
     static int _SPI_IOC_TRANSFER_SIZE = -1;
 
     static final long GPIO_GET_CHIPINFO_IOCTL;
-    static final long GPIO_GET_LINEINFO_IOCTL;
-    static final long GPIO_GET_LINEHANDLE_IOCTL;
-    static final long GPIO_GET_LINEEVENT_IOCTL;
 
-    static final long GPIOHANDLE_GET_LINE_VALUES_IOCTL;
-    static final long GPIOHANDLE_SET_LINE_VALUES_IOCTL;
+    static final long GPIO_V2_GET_LINEINFO_IOCTL;
+    static final long GPIO_V2_GET_LINEINFO_WATCH_IOCTL;
+    static final long GPIO_V2_GET_LINE_IOCTL;
+    static final long GPIO_V2_LINE_SET_CONFIG_IOCTL;
+    static final long GPIO_V2_LINE_GET_VALUES_IOCTL;
+    static final long GPIO_V2_LINE_SET_VALUES_IOCTL;
+
 
     final static long SPI_IOC_MAGIC = 'k';
     final static long _IOC_NRBITS = 8;
@@ -156,11 +163,14 @@ final class Internals {
         SPI_IOC_WR_LSB_FIRST = _IOW(GET_SPI_IOC_MAGIC(), 2, 1);
 
         GPIO_GET_CHIPINFO_IOCTL = _IOR(0xB4, 0x01, 68);
-        GPIO_GET_LINEINFO_IOCTL = _IOWR(0xB4, 0x02, 72);
-        GPIO_GET_LINEHANDLE_IOCTL = _IOWR(0xB4, 0x03, 364);
-        GPIO_GET_LINEEVENT_IOCTL = _IOWR(0xB4, 0x04, 48);
 
-        GPIOHANDLE_GET_LINE_VALUES_IOCTL = _IOWR(0xB4, 0x08, 64);
-        GPIOHANDLE_SET_LINE_VALUES_IOCTL = _IOWR(0xB4, 0x09, 64);
+
+        GPIO_V2_GET_LINEINFO_IOCTL = _IOWR(0xb4, 0x05, LineInfo.LAYOUT.byteSize());
+        GPIO_V2_GET_LINEINFO_WATCH_IOCTL = _IOWR(0xb4, 0x06, LineInfo.LAYOUT.byteSize());
+        GPIO_V2_GET_LINE_IOCTL = _IOWR(0xb4, 0x07, LineRequest.LAYOUT.byteSize());
+        GPIO_V2_LINE_SET_CONFIG_IOCTL = _IOWR(0xb4, 0x0d, LineConfig.LAYOUT.byteSize());
+        GPIO_V2_LINE_GET_VALUES_IOCTL = _IOWR(0xb4, 0x0e, LineValues.LAYOUT.byteSize());
+        GPIO_V2_LINE_SET_VALUES_IOCTL = _IOWR(0xb4, 0x0f, LineValues.LAYOUT.byteSize());
+
     }
 }

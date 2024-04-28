@@ -3,7 +3,7 @@ package org.digitalsmile.gpio.pin.attributes;
 /**
  * GPIO Pin state, representing if it is HIGH (1) or LOW (0).
  */
-public enum State {
+public enum PinState {
     /**
      * Represents electrical 1 on the Pin
      */
@@ -20,7 +20,7 @@ public enum State {
      *
      * @param state integer value of the State
      */
-    State(int state) {
+    PinState(int state) {
         this.value = state;
     }
 

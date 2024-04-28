@@ -15,7 +15,7 @@ import java.lang.invoke.VarHandle;
  * @param label label
  * @param lines lines
  */
-public record InfoStruct(byte[] name, byte[] label, int lines) implements NativeMemoryLayout {
+public record ChipInfo(byte[] name, byte[] label, int lines) implements NativeMemoryLayout {
     // see https://elixir.bootlin.com/linux/v6.7/source/include/uapi/linux/gpio.h#L32
     private static final MemoryLayout LAYOUT = MemoryLayout.structLayout(
             MemoryLayout.sequenceLayout(32, ValueLayout.JAVA_BYTE).withName("name"),
@@ -32,8 +32,8 @@ public record InfoStruct(byte[] name, byte[] label, int lines) implements Native
      *
      * @return InfoStruct structure
      */
-    public static InfoStruct createEmpty() {
-        return new InfoStruct(new byte[]{}, new byte[]{}, 0);
+    public static ChipInfo createEmpty() {
+        return new ChipInfo(new byte[]{}, new byte[]{}, 0);
     }
 
     @Override
@@ -43,8 +43,8 @@ public record InfoStruct(byte[] name, byte[] label, int lines) implements Native
 
     @SuppressWarnings("unchecked")
     @Override
-    public InfoStruct fromBytes(MemorySegment buffer) throws Throwable {
-        return new InfoStruct(
+    public ChipInfo fromBytes(MemorySegment buffer) throws Throwable {
+        return new ChipInfo(
                 invokeExact(MH_NAME, buffer).toArray(ValueLayout.JAVA_BYTE),
                 invokeExact(MH_LABEL, buffer).toArray(ValueLayout.JAVA_BYTE),
                 (int) VH_LINES.get(buffer)

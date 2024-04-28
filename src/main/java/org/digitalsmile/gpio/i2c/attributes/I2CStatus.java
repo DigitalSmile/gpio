@@ -3,7 +3,7 @@ package org.digitalsmile.gpio.i2c.attributes;
 /**
  * Status of devices on the bus.
  */
-public enum Status {
+public enum I2CStatus {
     /**
      * Device is available and ready to communicate.
      */
