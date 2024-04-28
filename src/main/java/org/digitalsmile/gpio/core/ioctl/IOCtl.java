@@ -142,7 +142,7 @@ public final class IOCtl extends NativeMemory {
                 var errnoStr = (MemorySegment) STR_ERROR.invokeExact(errno);
                 throw new NativeMemoryException("Error during ioctl call with file descriptor '" + fd + "', command '" +
                         IntegerToHex.convert(command) + "' and data '" + IntegerToHex.convert(data) + "': " +
-                        errnoStr.getUtf8String(0) + " (" + errno + ")", errno);
+                        errnoStr.getString(0) + " (" + errno + ")", errno);
             } catch (Throwable e) {
                 throw new NativeMemoryException(e.getMessage(), e);
             }
@@ -173,7 +173,7 @@ public final class IOCtl extends NativeMemory {
                 var errnoStr = (MemorySegment) STR_ERROR.invokeExact(errno);
                 throw new NativeMemoryException("Error during ioctl call with file descriptor '" + fd + "', command '" +
                         IntegerToHex.convert(command) + "' and data '" + data + "': " +
-                        errnoStr.getUtf8String(0) + " (" + errno + ")", errno);
+                        errnoStr.getString(0) + " (" + errno + ")", errno);
             }
             logger.trace("ioctl call return {}", callResult);
             result = data.fromBytes(bufferMemorySegment);

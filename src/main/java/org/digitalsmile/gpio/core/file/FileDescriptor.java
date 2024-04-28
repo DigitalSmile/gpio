@@ -1,7 +1,7 @@
 package org.digitalsmile.gpio.core.file;
 
-import org.digitalsmile.gpio.core.NativeMemory;
 import org.digitalsmile.gpio.NativeMemoryException;
+import org.digitalsmile.gpio.core.NativeMemory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,13 +52,13 @@ public final class FileDescriptor extends NativeMemory {
         logger.trace("Opening {}", path);
         var fd = 0;
         try (Arena offHeap = Arena.ofConfined()) {
-            var str = offHeap.allocateUtf8String(path);
+            var str = offHeap.allocateFrom(path);
             var capturedState = offHeap.allocate(CAPTURED_STATE_LAYOUT);
             fd = (int) OPEN64.invoke(capturedState, str, openFlag);
             if (fd < 0) {
                 int errno = (int) ERRNO_HANDLE.get(capturedState);
                 var errnoStr = (MemorySegment) STR_ERROR.invokeExact(errno);
-                throw new NativeMemoryException("Cannot open path '" + path + "': " + errnoStr.getUtf8String(0) + " (" + errno + ")", errno);
+                throw new NativeMemoryException("Cannot open path '" + path + "': " + errnoStr.getString(0) + " (" + errno + ")", errno);
             }
         } catch (NativeMemoryException e) {
             throw e;
@@ -95,7 +95,7 @@ public final class FileDescriptor extends NativeMemory {
             if (result < 0) {
                 int errno = (int) ERRNO_HANDLE.get(capturedState);
                 var errnoStr = (MemorySegment) STR_ERROR.invokeExact(errno);
-                throw new NativeMemoryException("Cannot close file descriptor '" + fd + "': " + errnoStr.getUtf8String(0) + " (" + errno + ")", errno);
+                throw new NativeMemoryException("Cannot close file descriptor '" + fd + "': " + errnoStr.getString(0) + " (" + errno + ")", errno);
             }
             logger.trace("Closed file descriptor with result {}", result);
         } catch (NativeMemoryException e) {
@@ -117,13 +117,13 @@ public final class FileDescriptor extends NativeMemory {
         logger.trace("Reading file descriptor {}", fd);
         var byteResult = new byte[size];
         try (Arena offHeap = Arena.ofConfined()) {
-            var bufferMemorySegment = offHeap.allocateArray(ValueLayout.JAVA_BYTE, byteResult);
+            var bufferMemorySegment = offHeap.allocateFrom(ValueLayout.JAVA_BYTE, byteResult);
             var capturedState = offHeap.allocate(CAPTURED_STATE_LAYOUT);
             var read = (int) READ.invoke(capturedState, fd, bufferMemorySegment, size);
             if (read == -1) {
                 int errno = (int) ERRNO_HANDLE.get(capturedState);
                 var errnoStr = (MemorySegment) STR_ERROR.invokeExact(errno);
-                throw new NativeMemoryException("Cannot read from file descriptor '" + fd + "': " + errnoStr.getUtf8String(0) + " (" + errno + ")", errno);
+                throw new NativeMemoryException("Cannot read from file descriptor '" + fd + "': " + errnoStr.getString(0) + " (" + errno + ")", errno);
             }
             logger.trace("Read {} of {} bytes", read, size);
             byteResult = bufferMemorySegment.toArray(ValueLayout.JAVA_BYTE);
@@ -148,13 +148,13 @@ public final class FileDescriptor extends NativeMemory {
         logger.trace("Writing to file descriptor {} with data {}", fd, Arrays.toString(data));
         var wrote = 0;
         try (Arena offHeap = Arena.ofConfined()) {
-            var bufferMemorySegment = offHeap.allocateArray(ValueLayout.JAVA_BYTE, data);
+            var bufferMemorySegment = offHeap.allocateFrom(ValueLayout.JAVA_BYTE, data);
             var capturedState = offHeap.allocate(CAPTURED_STATE_LAYOUT);
             wrote = (int) WRITE.invoke(capturedState, fd, bufferMemorySegment, data.length);
             if (wrote == -1) {
                 int errno = (int) ERRNO_HANDLE.get(capturedState);
                 var errnoStr = (MemorySegment) STR_ERROR.invokeExact(errno);
-                throw new NativeMemoryException("Cannot write to file descriptor '" + fd + "': " + errnoStr.getUtf8String(0) + " (" + errno + ")", errno);
+                throw new NativeMemoryException("Cannot write to file descriptor '" + fd + "': " + errnoStr.getString(0) + " (" + errno + ")", errno);
             }
             logger.trace("Wrote {} of {} bytes", wrote, data.length);
         } catch (NativeMemoryException e) {

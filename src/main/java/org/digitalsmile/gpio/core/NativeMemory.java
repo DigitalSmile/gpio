@@ -14,7 +14,7 @@ public class NativeMemory {
             MemoryLayout.PathElement.groupElement("errno"));
 
     protected static final AddressLayout POINTER = ValueLayout.ADDRESS.withTargetLayout(
-            MemoryLayout.sequenceLayout(ValueLayout.JAVA_BYTE));
+            MemoryLayout.sequenceLayout(1024, ValueLayout.JAVA_BYTE));
     protected static final MethodHandle STR_ERROR = Linker.nativeLinker().downcallHandle(
             Linker.nativeLinker().defaultLookup().find("strerror").orElseThrow(),
             FunctionDescriptor.of(POINTER, ValueLayout.JAVA_INT));

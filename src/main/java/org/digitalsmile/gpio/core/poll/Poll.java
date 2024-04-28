@@ -47,7 +47,7 @@ public final class Poll extends NativeMemory {
             if (callResult < 0) {
                 int errno = (int) ERRNO_HANDLE.get(capturedState);
                 var errnoStr = (MemorySegment) STR_ERROR.invokeExact(errno);
-                throw new NativeMemoryException("Polling of '" + pollingData.fd() + "' error: " + errnoStr.getUtf8String(0) + " (" + errno + ")", errno);
+                throw new NativeMemoryException("Polling of '" + pollingData.fd() + "' error: " + errnoStr.getString(0) + " (" + errno + ")", errno);
             }
             if (callResult == 0) {
                 logger.trace("Polling file descriptor '{}' timed out.", pollingData.fd());
