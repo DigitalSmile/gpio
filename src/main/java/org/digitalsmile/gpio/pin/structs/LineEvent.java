@@ -54,23 +54,23 @@ public record LineEvent(long timestampNs, int id, int offset, int seqNo, int lin
     @Override
     public LineEvent fromBytes(MemorySegment buffer) throws Throwable {
         return new LineEvent(
-                (long) VH_TIMESTAMP_NS.get(buffer),
-                (int) VH_ID.get(buffer),
-                (int) VH_OFFSET.get(buffer),
-                (int) VH_SEQ_NO.get(buffer),
-                (int) VH_LINE_SEQ_NO.get(buffer)
+                (long) VH_TIMESTAMP_NS.get(buffer, 0L),
+                (int) VH_ID.get(buffer, 0L),
+                (int) VH_OFFSET.get(buffer, 0L),
+                (int) VH_SEQ_NO.get(buffer, 0L),
+                (int) VH_LINE_SEQ_NO.get(buffer, 0L)
         );
     }
 
     @Override
     public void toBytes(MemorySegment buffer) throws Throwable {
-        VH_TIMESTAMP_NS.set(buffer, timestampNs);
-        VH_ID.set(buffer, id);
-        VH_OFFSET.set(buffer, offset);
-        VH_SEQ_NO.set(buffer, seqNo);
-        VH_LINE_SEQ_NO.set(buffer, lineSeqNo);
+        VH_TIMESTAMP_NS.set(buffer, 0L, timestampNs);
+        VH_ID.set(buffer, 0L, id);
+        VH_OFFSET.set(buffer, 0L, offset);
+        VH_SEQ_NO.set(buffer, 0L, seqNo);
+        VH_LINE_SEQ_NO.set(buffer, 0L, lineSeqNo);
 
-        var tmp = (MemorySegment) MH_PADDING.invokeExact(buffer);
+        var tmp = (MemorySegment) MH_PADDING.invokeExact(buffer, 0L);
         for (int i = 0; i < 5; i++) {
             tmp.setAtIndex(ValueLayout.JAVA_INT, i, 0);
         }

@@ -56,42 +56,42 @@ public record LineInfo(byte[] name, byte[] consumer, int offset, int numAttrs, l
     @SuppressWarnings("unchecked")
     @Override
     public LineInfo fromBytes(MemorySegment buffer) throws Throwable {
-        var numAttrs = (int) VH_NUM_ATTRS.get(buffer);
-        var attrsMemorySegment = (MemorySegment) MH_ATTRS.invokeExact(buffer);
+        var numAttrs = (int) VH_NUM_ATTRS.get(buffer, 0L);
+        var attrsMemorySegment = (MemorySegment) MH_ATTRS.invokeExact(buffer, 0L);
         var attrs = new LineAttribute[numAttrs];
         for (int i = 0; i < numAttrs; i++) {
             var attr = LineAttribute.createEmpty();
             attrs[i] = attr.fromBytes(attrsMemorySegment.asSlice(LineAttribute.LAYOUT.byteSize() * i, LineAttribute.LAYOUT.byteSize()));
         }
         return new LineInfo(
-                ((MemorySegment) MH_NAME.invokeExact(buffer)).toArray(ValueLayout.JAVA_BYTE),
-                ((MemorySegment) MH_CONSUMER.invokeExact(buffer)).toArray(ValueLayout.JAVA_BYTE),
-                (int) VH_OFFSET.get(buffer),
+                ((MemorySegment) MH_NAME.invokeExact(buffer, 0L)).toArray(ValueLayout.JAVA_BYTE),
+                ((MemorySegment) MH_CONSUMER.invokeExact(buffer, 0L)).toArray(ValueLayout.JAVA_BYTE),
+                (int) VH_OFFSET.get(buffer, 0L),
                 numAttrs,
-                (long) VH_FLAGS.get(buffer),
+                (long) VH_FLAGS.get(buffer, 0L),
                 attrs
         );
     }
 
     @Override
     public void toBytes(MemorySegment buffer) throws Throwable {
-        var tmp = (MemorySegment) MH_NAME.invokeExact(buffer);
+        var tmp = (MemorySegment) MH_NAME.invokeExact(buffer, 0L);
         for (int i = 0; i < name.length; i++) {
             tmp.setAtIndex(ValueLayout.JAVA_BYTE, i, name[i]);
         }
-        tmp = (MemorySegment) MH_CONSUMER.invokeExact(buffer);
+        tmp = (MemorySegment) MH_CONSUMER.invokeExact(buffer, 0L);
         for (int i = 0; i < consumer.length; i++) {
             tmp.setAtIndex(ValueLayout.JAVA_BYTE, i, consumer[i]);
         }
-        VH_OFFSET.set(buffer, offset);
-        VH_NUM_ATTRS.set(buffer, numAttrs);
-        VH_FLAGS.set(buffer, flags);
+        VH_OFFSET.set(buffer, 0L, offset);
+        VH_NUM_ATTRS.set(buffer, 0L,numAttrs);
+        VH_FLAGS.set(buffer, 0L, flags);
 
-        tmp = (MemorySegment) MH_ATTRS.invokeExact(buffer);
+        tmp = (MemorySegment) MH_ATTRS.invokeExact(buffer, 0L);
         for (int i = 0; i < numAttrs; i++) {
             attrs[i].toBytes(tmp.asSlice(LineAttribute.LAYOUT.byteSize() * i, LineAttribute.LAYOUT.byteSize()));
         }
-        tmp = (MemorySegment) MH_PADDING.invokeExact(buffer);
+        tmp = (MemorySegment) MH_PADDING.invokeExact(buffer, 0L);
         for (int i = 0; i < 4; i++) {
             tmp.setAtIndex(ValueLayout.JAVA_INT, i, 0);
         }

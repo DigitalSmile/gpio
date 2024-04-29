@@ -39,22 +39,22 @@ public record SMBusIoctlData(byte readWrite, byte command, int size, SMBusData d
     @SuppressWarnings("unchecked")
     @Override
     public SMBusIoctlData fromBytes(MemorySegment buffer) throws Throwable {
-        var readWrite = (byte) VH_READ_WRITE.get(buffer);
-        var command = (byte) VH_COMMAND.get(buffer);
-        var size = (int) VH_SIZE.get(buffer);
-        var tmp = (MemorySegment) MH_DATA.get(buffer);
+        var readWrite = (byte) VH_READ_WRITE.get(buffer, 0L);
+        var command = (byte) VH_COMMAND.get(buffer, 0L);
+        var size = (int) VH_SIZE.get(buffer, 0L);
+        var tmp = (MemorySegment) MH_DATA.get(buffer, 0L);
         var data0 = data.fromBytes(tmp);
         return new SMBusIoctlData(readWrite, command, size, data0);
     }
 
     @Override
     public void toBytes(MemorySegment buffer) throws Throwable {
-        VH_READ_WRITE.set(buffer, readWrite);
-        VH_COMMAND.set(buffer, command);
-        VH_SIZE.set(buffer, size);
+        VH_READ_WRITE.set(buffer, 0L, readWrite);
+        VH_COMMAND.set(buffer, 0L, command);
+        VH_SIZE.set(buffer, 0L, size);
         var smbusOffHeap = offHeap.allocate(SMBusData.LAYOUT);
         data.toBytes(smbusOffHeap);
-        MH_DATA.set(buffer, smbusOffHeap);
+        MH_DATA.set(buffer, 0L, smbusOffHeap);
     }
 
     @Override

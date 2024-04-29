@@ -47,7 +47,7 @@ public record ChipInfo(byte[] name, byte[] label, int lines) implements NativeMe
         return new ChipInfo(
                 invokeExact(MH_NAME, buffer).toArray(ValueLayout.JAVA_BYTE),
                 invokeExact(MH_LABEL, buffer).toArray(ValueLayout.JAVA_BYTE),
-                (int) VH_LINES.get(buffer)
+                (int) VH_LINES.get(buffer, 0L)
         );
     }
 
@@ -61,11 +61,11 @@ public record ChipInfo(byte[] name, byte[] label, int lines) implements NativeMe
         for (int i = 0; i < label.length; i++) {
             tmp.setAtIndex(ValueLayout.JAVA_INT, i, label[i]);
         }
-        VH_LINES.set(buffer, lines);
+        VH_LINES.set(buffer, 0L, lines);
     }
 
     private static MemorySegment invokeExact(MethodHandle handle, MemorySegment buffer) throws Throwable {
-        return ((MemorySegment) handle.invokeExact(buffer));
+        return ((MemorySegment) handle.invokeExact(buffer, 0L));
     }
 
     @Override

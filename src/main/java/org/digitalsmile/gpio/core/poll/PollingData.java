@@ -34,17 +34,17 @@ public record PollingData(int fd, short events, short revents) implements Native
     @Override
     public PollingData fromBytes(MemorySegment buffer) throws Throwable {
         return new PollingData(
-                (int) FD_FLAGS.get(buffer),
-                (short) EVENTS_FLAGS.get(buffer),
-                (short) REVENTS_FLAGS.get(buffer)
+                (int) FD_FLAGS.get(buffer, 0L),
+                (short) EVENTS_FLAGS.get(buffer, 0L),
+                (short) REVENTS_FLAGS.get(buffer, 0L)
         );
     }
 
     @Override
     public void toBytes(MemorySegment buffer) throws Throwable {
-        FD_FLAGS.set(buffer, fd);
-        EVENTS_FLAGS.set(buffer, events);
-        REVENTS_FLAGS.set(buffer, revents);
+        FD_FLAGS.set(buffer, 0L, fd);
+        EVENTS_FLAGS.set(buffer, 0L, events);
+        REVENTS_FLAGS.set(buffer, 0L, revents);
     }
 
     @Override

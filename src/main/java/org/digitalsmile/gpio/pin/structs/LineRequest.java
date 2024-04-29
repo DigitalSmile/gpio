@@ -59,37 +59,37 @@ public record LineRequest(int[] offsets, byte[] consumer, LineConfig config, int
     @SuppressWarnings("unchecked")
     @Override
     public LineRequest fromBytes(MemorySegment buffer) throws Throwable {
-        var lineConfigMemoryBuffer = (MemorySegment) MH_CONFIG.invokeExact(buffer);
+        var lineConfigMemoryBuffer = (MemorySegment) MH_CONFIG.invokeExact(buffer, 0L);
         var lineConfig = LineConfig.createEmpty().fromBytes(lineConfigMemoryBuffer);
         return new LineRequest(
-                ((MemorySegment) MH_OFFSETS.invokeExact(buffer)).toArray(ValueLayout.JAVA_INT),
-                ((MemorySegment) MH_CONSUMER.invokeExact(buffer)).toArray(ValueLayout.JAVA_BYTE),
+                ((MemorySegment) MH_OFFSETS.invokeExact(buffer, 0L)).toArray(ValueLayout.JAVA_INT),
+                ((MemorySegment) MH_CONSUMER.invokeExact(buffer, 0L)).toArray(ValueLayout.JAVA_BYTE),
                 lineConfig,
-                (int) VH_NUM_LINES.get(buffer),
-                (int) VH_EVENT_BUFFER_SIZE.get(buffer),
-                (int) VH_FD.get(buffer)
+                (int) VH_NUM_LINES.get(buffer, 0L),
+                (int) VH_EVENT_BUFFER_SIZE.get(buffer, 0L),
+                (int) VH_FD.get(buffer, 0L)
         );
     }
 
     @Override
     public void toBytes(MemorySegment buffer) throws Throwable {
-        var tmp = (MemorySegment) MH_OFFSETS.invokeExact(buffer);
+        var tmp = (MemorySegment) MH_OFFSETS.invokeExact(buffer, 0L);
         for (int i = 0; i < offsets.length; i++) {
             tmp.setAtIndex(ValueLayout.JAVA_INT, i, offsets[i]);
         }
-        tmp = (MemorySegment) MH_CONSUMER.invokeExact(buffer);
+        tmp = (MemorySegment) MH_CONSUMER.invokeExact(buffer, 0L);
         for (int i = 0; i < consumer.length; i++) {
             tmp.setAtIndex(ValueLayout.JAVA_BYTE, i, consumer[i]);
         }
-        tmp = (MemorySegment) MH_CONFIG.invokeExact(buffer);
+        tmp = (MemorySegment) MH_CONFIG.invokeExact(buffer, 0L);
         config.toBytes(tmp);
-        VH_NUM_LINES.set(buffer, numLines);
-        VH_EVENT_BUFFER_SIZE.set(buffer, eventBufferSize);
-        tmp = (MemorySegment) MH_PADDING.invokeExact(buffer);
+        VH_NUM_LINES.set(buffer, 0L, numLines);
+        VH_EVENT_BUFFER_SIZE.set(buffer, 0L, eventBufferSize);
+        tmp = (MemorySegment) MH_PADDING.invokeExact(buffer, 0L);
         for (int i = 0; i < 5; i++) {
             tmp.setAtIndex(ValueLayout.JAVA_INT, i, 0);
         }
-        VH_FD.set(buffer, fd);
+        VH_FD.set(buffer, 0L, fd);
     }
 
     @Override

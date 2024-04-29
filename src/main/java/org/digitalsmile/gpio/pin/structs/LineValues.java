@@ -30,14 +30,14 @@ public record LineValues(long bits, long mask) implements NativeMemoryLayout {
     @Override
     public LineValues fromBytes(MemorySegment buffer) throws Throwable {
         return new LineValues(
-                (long) VH_BITS.get(buffer),
-                (long) VH_MASK.get(buffer)
+                (long) VH_BITS.get(buffer, 0L),
+                (long) VH_MASK.get(buffer, 0L)
         );
     }
 
     @Override
     public void toBytes(MemorySegment buffer) throws Throwable {
-        VH_BITS.set(buffer, bits);
-        VH_MASK.set(buffer, mask);
+        VH_BITS.set(buffer, 0L, bits);
+        VH_MASK.set(buffer, 0L, mask);
     }
 }

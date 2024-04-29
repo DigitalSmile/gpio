@@ -39,20 +39,20 @@ public record LineConfigAttribute(LineAttribute attr, long mask) implements Nati
     @SuppressWarnings("unchecked")
     @Override
     public LineConfigAttribute fromBytes(MemorySegment buffer) throws Throwable {
-        var attrMemorySegment = (MemorySegment) MH_ATTR.invokeExact(buffer);
+        var attrMemorySegment = (MemorySegment) MH_ATTR.invokeExact(buffer, 0L);
         var attr = LineAttribute.createEmpty().fromBytes(attrMemorySegment);
         return new LineConfigAttribute(
                 attr,
-                (long) VH_MASK.get(buffer)
+                (long) VH_MASK.get(buffer, 0L)
 
         );
     }
 
     @Override
     public void toBytes(MemorySegment buffer) throws Throwable {
-        var attrMemorySegment = (MemorySegment) MH_ATTR.invokeExact(buffer);
+        var attrMemorySegment = (MemorySegment) MH_ATTR.invokeExact(buffer, 0L);
         attr.toBytes(attrMemorySegment);
-        VH_MASK.set(buffer, mask);
+        VH_MASK.set(buffer, 0L, mask);
     }
 
     @Override

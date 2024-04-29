@@ -76,15 +76,15 @@ public record SMBusData(byte _byte, byte word, byte[] block) implements NativeMe
     public SMBusData fromBytes(MemorySegment buffer) throws Throwable {
         var _byte = (byte) VH_BYTE.get(buffer);
         var word = (byte) VH_WORD.get(buffer);
-        var block = ((MemorySegment) MH_BLOCK.invokeExact(buffer)).toArray(ValueLayout.JAVA_BYTE);
+        var block = ((MemorySegment) MH_BLOCK.invokeExact(buffer, 0L)).toArray(ValueLayout.JAVA_BYTE);
         return new SMBusData(_byte, word, block);
     }
 
     @Override
     public void toBytes(MemorySegment buffer) throws Throwable {
-        VH_BYTE.set(buffer, _byte);
-        VH_WORD.set(buffer, word);
-        var tmp = ((MemorySegment) MH_BLOCK.invokeExact(buffer));
+        VH_BYTE.set(buffer, 0L, _byte);
+        VH_WORD.set(buffer, 0L, word);
+        var tmp = ((MemorySegment) MH_BLOCK.invokeExact(buffer, 0L));
         for (int i = 0; i < block.length; i++) {
             tmp.setAtIndex(ValueLayout.JAVA_BYTE, i, block[i]);
         }

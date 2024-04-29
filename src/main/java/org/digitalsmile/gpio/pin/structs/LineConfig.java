@@ -45,15 +45,15 @@ public record LineConfig(long flags, int numAttrs, LineConfigAttribute... attrs)
     @SuppressWarnings("unchecked")
     @Override
     public LineConfig fromBytes(MemorySegment buffer) throws Throwable {
-        var numAttrs = (int) VH_NUM_ATTRS.get(buffer);
-        var attrsMemorySegment = (MemorySegment) MH_ATTRS.invokeExact(buffer);
+        var numAttrs = (int) VH_NUM_ATTRS.get(buffer, 0L);
+        var attrsMemorySegment = (MemorySegment) MH_ATTRS.invokeExact(buffer, 0L);
         var attrs = new LineConfigAttribute[numAttrs];
         for (int i = 0; i < numAttrs; i++) {
             var attr = LineConfigAttribute.createEmpty();
             attrs[i] = attr.fromBytes(attrsMemorySegment.asSlice(LineConfigAttribute.LAYOUT.byteSize() * i, LineConfigAttribute.LAYOUT.byteSize()));
         }
         return new LineConfig(
-                (long) VH_FLAGS.get(buffer),
+                (long) VH_FLAGS.get(buffer, 0L),
                 numAttrs,
                 attrs
         );
@@ -61,13 +61,13 @@ public record LineConfig(long flags, int numAttrs, LineConfigAttribute... attrs)
 
     @Override
     public void toBytes(MemorySegment buffer) throws Throwable {
-        VH_FLAGS.set(buffer, flags);
-        VH_NUM_ATTRS.set(buffer, numAttrs);
-        var tmp = (MemorySegment) MH_PADDING.invokeExact(buffer);
+        VH_FLAGS.set(buffer, 0L, flags);
+        VH_NUM_ATTRS.set(buffer, 0L, numAttrs);
+        var tmp = (MemorySegment) MH_PADDING.invokeExact(buffer, 0L);
         for (int i = 0; i < 5; i++) {
             tmp.setAtIndex(ValueLayout.JAVA_INT, i, 0);
         }
-        tmp = (MemorySegment) MH_ATTRS.invokeExact(buffer);
+        tmp = (MemorySegment) MH_ATTRS.invokeExact(buffer, 0L);
         for (int i = 0; i < numAttrs; i++) {
             attrs[i].toBytes(tmp.asSlice(LineConfigAttribute.LAYOUT.byteSize() * i, LineConfigAttribute.LAYOUT.byteSize()));
         }

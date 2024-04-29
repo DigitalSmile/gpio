@@ -68,15 +68,15 @@ public record LineAttribute(int id, long flags, long values, int debouncePeriodU
     @SuppressWarnings("unchecked")
     @Override
     public LineAttribute fromBytes(MemorySegment buffer) throws Throwable {
-        var id = (int) VH_ID.get(buffer);
+        var id = (int) VH_ID.get(buffer, 0L);
         long flags = 0, values = 0;
         int debouncePeriodUs = 0;
         var unionSize = LAYOUT.select(MemoryLayout.PathElement.groupElement("union")).byteSize();
         var unionBuffer = buffer.asSlice(LAYOUT.byteSize() - unionSize, unionSize);
         switch (AttributeId.getByValue(id)) {
-            case FLAGS -> flags = (long) VH_FLAGS.get(unionBuffer);
-            case OUTPUT_VALUES -> values = (long) VH_VALUES.get(unionBuffer);
-            case ID_DEBOUNCE -> debouncePeriodUs = (int) VH_DEBOUNCE_PERIOD_US.get(unionBuffer);
+            case FLAGS -> flags = (long) VH_FLAGS.get(unionBuffer, 0L);
+            case OUTPUT_VALUES -> values = (long) VH_VALUES.get(unionBuffer, 0L);
+            case ID_DEBOUNCE -> debouncePeriodUs = (int) VH_DEBOUNCE_PERIOD_US.get(unionBuffer, 0L);
             case null, default ->
                     throw new NativeMemoryException("id value is not one of " + Arrays.toString(AttributeId.values()));
         }
@@ -91,15 +91,15 @@ public record LineAttribute(int id, long flags, long values, int debouncePeriodU
 
     @Override
     public void toBytes(MemorySegment buffer) throws Throwable {
-        VH_ID.set(buffer, id);
-        VH_PADDING.set(buffer, 0);
+        VH_ID.set(buffer, 0L, id);
+        VH_PADDING.set(buffer, 0L, 0);
 
         var unionSize = LAYOUT.select(MemoryLayout.PathElement.groupElement("union")).byteSize();
         var unionBuffer = buffer.asSlice(LAYOUT.byteSize() - unionSize, unionSize);
         switch (AttributeId.getByValue(id)) {
-            case FLAGS -> VH_FLAGS.set(unionBuffer, flags);
-            case OUTPUT_VALUES -> VH_VALUES.set(unionBuffer, values);
-            case ID_DEBOUNCE -> VH_DEBOUNCE_PERIOD_US.set(unionBuffer, debouncePeriodUs);
+            case FLAGS -> VH_FLAGS.set(unionBuffer, 0L, flags);
+            case OUTPUT_VALUES -> VH_VALUES.set(unionBuffer, 0L, values);
+            case ID_DEBOUNCE -> VH_DEBOUNCE_PERIOD_US.set(unionBuffer, 0L, debouncePeriodUs);
             case null, default ->
                     throw new NativeMemoryException("id value is not one of " + Arrays.toString(AttributeId.values()));
         }
