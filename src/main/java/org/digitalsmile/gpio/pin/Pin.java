@@ -1,13 +1,16 @@
 package org.digitalsmile.gpio.pin;
 
+import io.github.digitalsmile.annotation.function.NativeMemoryException;
 import org.digitalsmile.gpio.GPIOBoard;
-import org.digitalsmile.gpio.NativeMemoryException;
 import org.digitalsmile.gpio.core.file.FileDescriptor;
+import org.digitalsmile.gpio.core.file.FileDescriptorNative;
 import org.digitalsmile.gpio.core.file.FileFlag;
 import org.digitalsmile.gpio.core.ioctl.Command;
-import org.digitalsmile.gpio.core.ioctl.IOCtl;
+import org.digitalsmile.gpio.core.ioctl.Ioctl;
+import org.digitalsmile.gpio.core.ioctl.IoctlNative;
 import org.digitalsmile.gpio.core.poll.Poll;
 import org.digitalsmile.gpio.core.poll.PollFlag;
+import org.digitalsmile.gpio.core.poll.PollNative;
 import org.digitalsmile.gpio.core.poll.PollingData;
 import org.digitalsmile.gpio.pin.attributes.PinDirection;
 import org.digitalsmile.gpio.pin.attributes.PinEvent;
@@ -36,6 +39,9 @@ import java.util.concurrent.ThreadFactory;
 public final class Pin implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(Pin.class);
     private static final StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
+    private static final Ioctl IOCTL = new IoctlNative();
+    private static final FileDescriptor FILE = new FileDescriptorNative();
+    private static final Poll POLL = new PollNative();
 
     private final String deviceName;
     private final int pin;
@@ -67,26 +73,26 @@ public final class Pin implements AutoCloseable {
         }
         this.deviceName = deviceName;
         this.pin = gpioPin;
-        logger.info("{}-{} - setting up GPIO Pin...", deviceName, gpioPin);
+        logger.debug("{}-{} - setting up GPIO Pin...", deviceName, gpioPin);
         logger.debug("{}-{} - opening device file.", deviceName, gpioPin);
-        var fd = FileDescriptor.open(deviceName, FileFlag.O_RDONLY | FileFlag.O_CLOEXEC);
-        var lineInfo = LineInfo.create(gpioPin);
+        var fd = FILE.open(deviceName, FileFlag.O_RDONLY | FileFlag.O_CLOEXEC);
+        var lineInfo = new LineInfo(new byte[]{}, new byte[]{}, gpioPin, 0, 0, new LineAttribute[]{}, new int[]{});
         logger.debug("{}-{} - getting line info.", deviceName, gpioPin);
-        this.lineInfo = IOCtl.call(fd, Command.getGpioV2GetLineInfoIoctl(), lineInfo);
+        this.lineInfo = IOCTL.call(fd, Command.getGpioV2GetLineInfoIoctl(), lineInfo);
         if ((lineInfo.flags() & PinFlag.USED.getValue()) > 0) {
             close();
             throw new RuntimeException("Pin " + pin + " is in use");
         }
-        logger.info("{}-{} - GPIO Pin line info: {}", deviceName, gpioPin, lineInfo);
+        logger.debug("{}-{} - GPIO Pin line info: {}", deviceName, gpioPin, lineInfo);
         // if the direction is input we automatically add event detection to the pin for future use
         var flags = pinDirection.equals(PinDirection.INPUT) ? (PinFlag.EDGE_FALLING.getValue() | PinFlag.EDGE_RISING.getValue()) : 0;
-        var lineConfig = new LineConfig(pinDirection.getMode() | flags, 0);
-        var lineRequest = LineRequest.create(new int[]{pin}, "org.digitalsmile.gpio", lineConfig);
-        var result = IOCtl.call(fd, Command.getGpioV2GetLineIoctl(), lineRequest);
+        var lineConfig = new LineConfig(pinDirection.getMode() | flags, 0, new int[]{}, new LineConfigAttribute[]{});
+        var lineRequest = new LineRequest(new int[]{pin}, "org.digitalsmile.gpio".getBytes(), lineConfig, 0, 0, new int[]{}, 0);
+        var result = IOCTL.call(fd, Command.getGpioV2GetLineIoctl(), lineRequest);
         this.fd = result.fd();
 
         this.pinDirection = pinDirection;
-        logger.info("{}-{} - GPIO Pin configured: {}", deviceName, gpioPin, result);
+        logger.debug("{}-{} - GPIO Pin configured: {}", deviceName, gpioPin, result);
     }
 
     /**
@@ -132,8 +138,8 @@ public final class Pin implements AutoCloseable {
      */
     @Override
     public void close() throws NativeMemoryException {
-        logger.info("{}-{} - closing GPIO Pin.", deviceName, pin);
-        FileDescriptor.close(fd);
+        logger.debug("{}-{} - closing GPIO Pin.", deviceName, pin);
+        FILE.close(fd);
         this.watcher = null;
         this.closed = true;
         logger.debug("{}-{} - GPIO Pin is closed. Recreate the pin object to reuse.", deviceName, pin);
@@ -149,7 +155,7 @@ public final class Pin implements AutoCloseable {
         checkClosed();
         logger.trace("{}-{} - reading GPIO Pin.", deviceName, pin);
         var lineValues = new LineValues(0, 1);
-        var result = IOCtl.call(fd, Command.getGpioV2GetValuesIoctl(), lineValues);
+        var result = IOCTL.call(fd, Command.getGpioV2GetValuesIoctl(), lineValues);
         this.pinState = result.bits() == 1 ? PinState.HIGH : PinState.LOW;
         logger.trace("{}-{} - new GPIO Pin state is {}.", deviceName, pin, pinState);
         return pinState;
@@ -169,7 +175,7 @@ public final class Pin implements AutoCloseable {
         }
         logger.trace("{}-{} - setting GPIO Pin to state {}.", deviceName, pin, pinState);
         var lineValues = new LineValues(pinState.getValue(), 1);
-        IOCtl.call(fd, Command.getGpioV2SetValuesIoctl(), lineValues);
+        IOCTL.call(fd, Command.getGpioV2SetValuesIoctl(), lineValues);
         this.pinState = pinState;
     }
 
@@ -220,7 +226,7 @@ public final class Pin implements AutoCloseable {
             logger.error("{}-{} - cannot start event detection, the watcher thread is already running.", deviceName, pin);
             return null;
         }
-        logger.info("{}-{} - adding event {} detection with buffer size {}.", deviceName, pin, pinEvent, eventBufferSize);
+        logger.debug("{}-{} - adding event {} detection with buffer size {}.", deviceName, pin, pinEvent, eventBufferSize);
         this.watcher = new EventWatcher(fd, pinEvent, eventProcessor, eventBufferSize);
         return eventTaskProcessor.submit(watcher);
     }
@@ -241,7 +247,7 @@ public final class Pin implements AutoCloseable {
             logger.error("{}-{} - cannot start event detection, the watcher thread is already running.", deviceName, pin);
             return null;
         }
-        logger.info("{}-{} - adding event {} detection with pulse delay {}.", deviceName, pin, pinEvent, updatePeriod);
+        logger.debug("{}-{} - adding event {} detection with pulse delay {}.", deviceName, pin, pinEvent, updatePeriod);
         this.watcher = new EventWatcher(fd, pinEvent, eventProcessor, updatePeriod);
         return eventTaskProcessor.submit(watcher);
     }
@@ -318,7 +324,7 @@ public final class Pin implements AutoCloseable {
                 try {
                     // number of file descriptors is set to 1, since we are polling only one pin
                     // timeout is set to 25s for default
-                    var retPollFd = Poll.poll(pollFd, 1, updatePeriod.equals(Duration.ZERO) ? 25_000 : (int) updatePeriod.toMillis());
+                    var retPollFd = POLL.poll(pollFd, 1, updatePeriod.equals(Duration.ZERO) ? 25_000 : (int) updatePeriod.toMillis());
                     if (retPollFd == null) {
                         // timeout happened, process all left events, update timestamp
                         eventProcessor.process(eventList);
@@ -329,7 +335,7 @@ public final class Pin implements AutoCloseable {
                     if ((retPollFd.revents() & (PollFlag.POLLIN)) != 0) {
                         // default minimum buffer size is 16 line events
                         // see https://elixir.bootlin.com/linux/latest/source/include/uapi/linux/gpio.h#L185
-                        var buf = FileDescriptor.read(fd, 16 * eventSize);
+                        var buf = FILE.read(fd, new byte[16 * eventSize], 16 * eventSize);
                         var holder = new byte[eventSize];
                         for (int i = 0; i < 16 * LineEvent.LAYOUT.byteSize(); i += eventSize) {
                             // check if timestamp is 0, then there is no event present, we can skip
@@ -341,7 +347,7 @@ public final class Pin implements AutoCloseable {
                             var event = LineEvent.createEmpty().fromBytes(memoryBuffer);
                             // process only interested events
                             if ((event.id() & this.pinEvent.getValue()) != 0) {
-                                eventList.add(new DetectedEvent(event.timestampNs(), PinEvent.getByValue(event.id()), event.lineSeqNo()));
+                                eventList.add(new DetectedEvent(event.timestampNs(), PinEvent.getByValue(event.id()), event.lineSeqno()));
                             }
                         }
                         if (eventList.size() >= eventBufferSize && updatePeriod.equals(Duration.ZERO)) {

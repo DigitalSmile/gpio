@@ -23,8 +23,17 @@ java {
     withJavadocJar()
 }
 
+javadoc {
+    source = sourceSets.main.resources
+}
+
 dependencies {
     implementation 'org.slf4j:slf4j-api:2.0.13'
+    implementation 'ch.qos.logback:logback-core:1.4.12'
+    implementation 'ch.qos.logback:logback-classic:1.4.12'
+
+    annotationProcessor 'io.github.digitalsmile.native:annotation-processor:0.7'
+    implementation 'io.github.digitalsmile.native:annotation:0.7'
 
     testImplementation platform('org.junit:junit-bom:5.9.1')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -32,6 +41,7 @@ dependencies {
 
 tasks.jar {
     manifest.attributes["Main-Class"] = "org.digitalsmile.gpio.GPIOBoard"
+    manifest.attributes["Enable-Native-Access"] = "ALL-UNNAMED"
 }
 
 test {

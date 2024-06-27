@@ -1,12 +1,16 @@
 package org.digitalsmile.gpio.i2c;
 
+import io.github.digitalsmile.annotation.function.NativeMemoryException;
 import org.digitalsmile.gpio.GPIOBoard;
-import org.digitalsmile.gpio.NativeMemoryException;
 import org.digitalsmile.gpio.core.IntegerToHex;
 import org.digitalsmile.gpio.core.file.FileDescriptor;
+import org.digitalsmile.gpio.core.file.FileDescriptorNative;
 import org.digitalsmile.gpio.core.file.FileFlag;
 import org.digitalsmile.gpio.core.ioctl.Command;
-import org.digitalsmile.gpio.core.ioctl.IOCtl;
+import org.digitalsmile.gpio.core.ioctl.Ioctl;
+import org.digitalsmile.gpio.core.ioctl.IoctlNative;
+import org.digitalsmile.gpio.core.poll.Poll;
+import org.digitalsmile.gpio.core.poll.PollNative;
 import org.digitalsmile.gpio.i2c.attributes.I2CFlag;
 import org.digitalsmile.gpio.i2c.attributes.I2CFunctionality;
 import org.digitalsmile.gpio.i2c.attributes.I2CStatus;
@@ -32,9 +36,12 @@ import java.util.Map;
  * <p>
  * Before reading / writing, please select the deviceAddress. All device addresses can be found by scan method.
  */
-public class I2CBus {
+public class I2CBus implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(I2CBus.class);
     private static final StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
+    private static final Ioctl IOCTL = new IoctlNative();
+    private static final FileDescriptor FILE = new FileDescriptorNative();
+    private static final Poll POLL = new PollNative();
 
     private final String path;
     private final int i2cFileDescriptor;
@@ -56,22 +63,22 @@ public class I2CBus {
         }
         this.path = i2cPath + busNumber;
 
-        logger.info("{} - setting up I2CBus...", path);
+        logger.debug("{} - setting up I2CBus...", path);
         logger.debug("{} - opening device file.", path);
-        this.i2cFileDescriptor = FileDescriptor.open(path, FileFlag.O_RDWR);
+        this.i2cFileDescriptor = FILE.open(path, FileFlag.O_RDWR);
         logger.debug("{} - loading supported functionalities.", path);
-        var i2cFunctions = IOCtl.call(i2cFileDescriptor, Command.getI2CFuncs(), 0);
+        var i2cFunctions = IOCTL.call(i2cFileDescriptor, Command.getI2CFuncs(), 0);
         for (I2CFunctionality i2CFunctionality : I2CFunctionality.values()) {
             var supported = (i2cFunctions & i2CFunctionality.getValue()) != 0;
             functionalityMap.put(i2CFunctionality, supported);
             logger.trace("{} - functionality {}({}) is {}.", path, i2CFunctionality.name(), IntegerToHex.convert(i2CFunctionality.getValue()), supported ? "supported" : "not supported");
         }
         if (functionalityMap.get(I2CFunctionality.I2C_FUNC_I2C)) {
-            logger.info("{} - I2CBus will be using direct file mode for read/write operations.", path);
+            logger.debug("{} - I2CBus will be using direct file mode for read/write operations.", path);
         } else if (functionalityMap.get(I2CFunctionality.I2C_FUNC_SMBUS_BYTE_DATA) ||
                 functionalityMap.get(I2CFunctionality.I2C_FUNC_SMBUS_WORD_DATA) ||
                 functionalityMap.get(I2CFunctionality.I2C_FUNC_SMBUS_I2C_BLOCK)) {
-            logger.info("{} - I2CBus will be using ioctl with SMBus mode for read/write operations.", path);
+            logger.debug("{} - I2CBus will be using ioctl with SMBus mode for read/write operations.", path);
         } else {
             logger.error("{} - Cannot configure I2CBus!", path);
             for (Map.Entry<I2CFunctionality, Boolean> functionality : functionalityMap.entrySet()) {
@@ -81,7 +88,11 @@ public class I2CBus {
             }
             throw new NativeMemoryException(path + " does not support any of read/write operations!");
         }
-        logger.info("{} - I2CBus configured.", path);
+        logger.debug("{} - I2CBus configured.", path);
+    }
+
+    public Map<I2CFunctionality, Boolean> getFunctionalities() {
+        return functionalityMap;
     }
 
     /**
@@ -90,7 +101,7 @@ public class I2CBus {
      * @return map of all addresses with corresponding statuses (AVAILABLE, BUSY, NOT_AVAILABLE, UNKNOWN)
      */
     public Map<Integer, I2CStatus> scan() {
-        logger.info("{} - start scan of I2CBus for available devices...", path);
+        logger.debug("{} - start scan of I2CBus for available devices...", path);
         Map<Integer, I2CStatus> addressStatusMap = new HashMap<>();
         for (int i = 0; i <= I2CFlag.MAX_7BIT_DEVICES; i++) {
             try {
@@ -112,7 +123,7 @@ public class I2CBus {
             }
             this.selectedAddress = -1;
         }
-        logger.info("{} - found {} devices!", path, addressStatusMap.entrySet()
+        logger.debug("{} - found {} devices!", path, addressStatusMap.entrySet()
                 .stream().filter(e -> e.getValue().equals(I2CStatus.AVAILABLE) || e.getValue().equals(I2CStatus.BUSY)).count());
         return addressStatusMap;
     }
@@ -137,7 +148,7 @@ public class I2CBus {
      */
     public void selectAddress(int address, boolean tenBitsAddress) throws NativeMemoryException {
         if (tenBitsAddress && functionalityMap.get(I2CFunctionality.I2C_FUNC_10BIT_ADDR)) {
-            IOCtl.callByValue(i2cFileDescriptor, Command.getI2CTenBit(), 1);
+            IOCTL.callByValue(i2cFileDescriptor, Command.getI2CTenBit(), 1);
         } else {
             throw new NativeMemoryException("Cannot set 10bit address, because device '" + path + "' does not support 10bit addressing extension.");
         }
@@ -153,7 +164,7 @@ public class I2CBus {
      */
     public void write(int registerAddress, int data) throws NativeMemoryException {
         checkAddressSelected();
-        logger.info("{} - writing to '{}' with data '{}'.", path, IntegerToHex.convert(registerAddress), IntegerToHex.convert(data));
+        logger.debug("{} - writing to '{}' with data '{}'.", path, IntegerToHex.convert(registerAddress), IntegerToHex.convert(data));
         writeInternal(registerAddress, data);
     }
 
@@ -169,7 +180,7 @@ public class I2CBus {
         if (data.length > I2CFlag.I2C_SMBUS_BLOCK_MAX) {
             throw new RuntimeException("The size of write block data must not be more than 32 bytes.");
         }
-        logger.info("{} - writing to '{}' with data '{}'.", path, IntegerToHex.convert(registerAddress), Arrays.toString(data));
+        logger.debug("{} - writing to '{}' with data '{}'.", path, IntegerToHex.convert(registerAddress), Arrays.toString(data));
         writeInternal(registerAddress, data);
     }
 
@@ -182,7 +193,7 @@ public class I2CBus {
      */
     public int read(int registerAddress) throws NativeMemoryException {
         checkAddressSelected();
-        logger.info("{} - reading from '{}'.", path, IntegerToHex.convert(registerAddress));
+        logger.debug("{} - reading from '{}'.", path, IntegerToHex.convert(registerAddress));
         return readInternal(registerAddress);
     }
 
@@ -199,7 +210,7 @@ public class I2CBus {
         if (size > I2CFlag.I2C_SMBUS_BLOCK_MAX) {
             throw new RuntimeException("The size of read block data must not be more than 32 bytes.");
         }
-        logger.info("{} - reading from '{}' {} bytes.", path, IntegerToHex.convert(registerAddress), size);
+        logger.debug("{} - reading from '{}' {} bytes.", path, IntegerToHex.convert(registerAddress), size);
         return readInternal(registerAddress, size);
     }
 
@@ -210,7 +221,7 @@ public class I2CBus {
      * @throws NativeMemoryException if the address cannot be selected
      */
     private void selectAddressInternal(int address) throws NativeMemoryException {
-        IOCtl.callByValue(i2cFileDescriptor, Command.getI2CSlave(), address);
+        IOCTL.callByValue(i2cFileDescriptor, Command.getI2CSlave(), address);
         this.selectedAddress = address;
     }
 
@@ -227,11 +238,11 @@ public class I2CBus {
             var buffer = new byte[2];
             buffer[0] = (byte) registerAddress;
             buffer[1] = (byte) data;
-            FileDescriptor.write(i2cFileDescriptor, buffer);
+            FILE.write(i2cFileDescriptor, buffer);
         } else if (functionalityMap.get(I2CFunctionality.I2C_FUNC_SMBUS_WRITE_I2C_BLOCK)) {
             var smbusData = new SMBusIoctlData(I2CFlag.I2C_SMBUS_WRITE, (byte) registerAddress, I2CFlag.I2C_SMBUS_WORD_DATA,
-                    SMBusData.createEmptyWithByte((byte) data));
-            IOCtl.call(i2cFileDescriptor, Command.getI2CSMBus(), smbusData);
+                    new SMBusData((byte) data, (short) 0, new byte[]{}));
+            IOCTL.call(i2cFileDescriptor, Command.getI2CSMBus(), smbusData);
         } else {
             throw new NativeMemoryException("No available write method is supported!");
         }
@@ -250,14 +261,14 @@ public class I2CBus {
             var buffer = new byte[data.length + 1];
             buffer[0] = (byte) registerAddress;
             System.arraycopy(data, 0, buffer, 1, data.length);
-            FileDescriptor.write(i2cFileDescriptor, buffer);
+            FILE.write(i2cFileDescriptor, buffer);
         } else if (functionalityMap.get(I2CFunctionality.I2C_FUNC_SMBUS_WRITE_I2C_BLOCK)) {
             var buffer = new byte[data.length + 1];
             buffer[0] = (byte) data.length;
             System.arraycopy(data, 0, buffer, 1, data.length);
             var smbusData = new SMBusIoctlData(I2CFlag.I2C_SMBUS_WRITE, (byte) registerAddress, I2CFlag.I2C_SMBUS_I2C_BLOCK_DATA,
-                    SMBusData.createEmptyWithBlock(buffer));
-            IOCtl.call(i2cFileDescriptor, Command.getI2CSMBus(), smbusData);
+                    new SMBusData((byte) 0, (short) 0, buffer));
+            IOCTL.call(i2cFileDescriptor, Command.getI2CSMBus(), smbusData);
         } else {
             throw new NativeMemoryException("No available write method is supported!");
         }
@@ -274,13 +285,13 @@ public class I2CBus {
     private int readInternal(int registerAddress) throws NativeMemoryException {
         var result = 0;
         if (functionalityMap.get(I2CFunctionality.I2C_FUNC_I2C)) {
-            FileDescriptor.write(i2cFileDescriptor, new byte[]{(byte) registerAddress});
-            var buffer = FileDescriptor.read(i2cFileDescriptor, 4);
+            FILE.write(i2cFileDescriptor, new byte[]{(byte) registerAddress});
+            var buffer = FILE.read(i2cFileDescriptor, new byte[4], 4);
             result = ByteBuffer.wrap(buffer).order(ByteOrder.nativeOrder()).getInt();
         } else if (functionalityMap.get(I2CFunctionality.I2C_FUNC_SMBUS_READ_WORD_DATA)) {
             var smbusData = new SMBusIoctlData(I2CFlag.I2C_SMBUS_READ, (byte) registerAddress, I2CFlag.I2C_SMBUS_WORD_DATA,
                     SMBusData.createEmpty());
-            var tempResult = IOCtl.call(i2cFileDescriptor, Command.getI2CSMBus(), smbusData);
+            var tempResult = IOCTL.call(i2cFileDescriptor, Command.getI2CSMBus(), smbusData);
             result = tempResult.data()._byte();
         } else {
             throw new NativeMemoryException("No available read method is supported!");
@@ -300,14 +311,14 @@ public class I2CBus {
     private byte[] readInternal(int registerAddress, int size) throws NativeMemoryException {
         var result = new byte[]{};
         if (functionalityMap.get(I2CFunctionality.I2C_FUNC_I2C)) {
-            FileDescriptor.write(i2cFileDescriptor, new byte[]{(byte) registerAddress});
-            result = FileDescriptor.read(i2cFileDescriptor, size);
+            FILE.write(i2cFileDescriptor, new byte[]{(byte) registerAddress});
+            result = FILE.read(i2cFileDescriptor, new byte[size], size);
         } else if (functionalityMap.get(I2CFunctionality.I2C_FUNC_SMBUS_READ_I2C_BLOCK)) {
             var buffer = new byte[size + 1];
             buffer[0] = (byte) size;
             var smbusData = new SMBusIoctlData(I2CFlag.I2C_SMBUS_READ, (byte) registerAddress, I2CFlag.I2C_SMBUS_I2C_BLOCK_DATA,
-                    SMBusData.createEmptyWithBlock(buffer));
-            var tempResult = IOCtl.call(i2cFileDescriptor, Command.getI2CSMBus(), smbusData);
+                    new SMBusData((byte) 0, (short) 0, buffer));
+            var tempResult = IOCTL.call(i2cFileDescriptor, Command.getI2CSMBus(), smbusData);
             result = tempResult.data().block();
         } else {
             throw new NativeMemoryException("No available read method is supported!");
@@ -322,5 +333,10 @@ public class I2CBus {
         if (selectedAddress == -1) {
             throw new RuntimeException("Address is not selected, please use I2CBus.selectAddress(...) method first.");
         }
+    }
+
+    @Override
+    public void close() throws NativeMemoryException {
+        FILE.close(i2cFileDescriptor);
     }
 }

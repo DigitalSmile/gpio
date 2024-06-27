@@ -1,10 +1,13 @@
 package org.digitalsmile.gpio.spi;
 
+import io.github.digitalsmile.annotation.function.NativeMemoryException;
 import org.digitalsmile.gpio.GPIOBoard;
-import org.digitalsmile.gpio.NativeMemoryException;
 import org.digitalsmile.gpio.core.file.FileDescriptor;
+import org.digitalsmile.gpio.core.file.FileDescriptorNative;
+import org.digitalsmile.gpio.core.file.FileFlag;
 import org.digitalsmile.gpio.core.ioctl.Command;
-import org.digitalsmile.gpio.core.ioctl.IOCtl;
+import org.digitalsmile.gpio.core.ioctl.Ioctl;
+import org.digitalsmile.gpio.core.ioctl.IoctlNative;
 import org.digitalsmile.gpio.spi.attributes.SPIMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +19,8 @@ import org.slf4j.LoggerFactory;
 public final class SPIBus {
     private static final Logger logger = LoggerFactory.getLogger(SPIBus.class);
     private static final StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
+    private static final Ioctl IOCTL = new IoctlNative();
+    private static final FileDescriptor FILE = new FileDescriptorNative();
 
     private final String path;
     private SPIMode SPIMode;
@@ -32,7 +37,7 @@ public final class SPIBus {
      *
      * @param spiPath        path to SPI bus device
      * @param busNumber      bus number
-     * @param SPIMode           SPI mode to be configured
+     * @param SPIMode        SPI mode to be configured
      * @param clockFrequency desired clock frequency of SPI bus
      * @param byteLength     byte length to be configured (usually 8)
      * @param bitOrdering    bit ordering in the byte
@@ -50,7 +55,7 @@ public final class SPIBus {
 
         logger.info("{} - setting up SPIBus...", path);
         logger.debug("{} - opening device file.", path);
-        this.spiFileDescriptor = FileDescriptor.open(path);
+        this.spiFileDescriptor = FILE.open(path, FileFlag.O_RDWR);
 
         init();
         logger.info("{} - SPIBus configured.", path);
@@ -157,13 +162,13 @@ public final class SPIBus {
     public void init() throws NativeMemoryException {
         checkClosed();
         logger.debug("{} - setting SPI Mode to {}.", path, SPIMode);
-        IOCtl.call(spiFileDescriptor, Command.getSpiIocWrMode(), SPIMode.getValue());
+        IOCTL.call(spiFileDescriptor, Command.getSpiIocWrMode(), SPIMode.getValue());
         logger.debug("{} - setting Bit Ordering to {}.", path, bitOrdering);
-        IOCtl.call(spiFileDescriptor, Command.getSpiIocWrLsbFirst(), bitOrdering);
+        IOCTL.call(spiFileDescriptor, Command.getSpiIocWrLsbFirst(), bitOrdering);
         logger.debug("{} - setting Byte Length to {}.", path, byteLength);
-        IOCtl.call(spiFileDescriptor, Command.getSpiIocWrBitsPerWord(), byteLength);
+        IOCTL.call(spiFileDescriptor, Command.getSpiIocWrBitsPerWord(), byteLength);
         logger.debug("{} - setting Clock Frequency to {}.", path, clockFrequency);
-        IOCtl.call(spiFileDescriptor, Command.getSpiIocWrMaxSpeedHz(), clockFrequency);
+        IOCTL.call(spiFileDescriptor, Command.getSpiIocWrMaxSpeedHz(), clockFrequency);
     }
 
     /**
@@ -177,8 +182,8 @@ public final class SPIBus {
     public byte[] sendByteData(byte[] data, boolean immediateRead) throws NativeMemoryException {
         checkClosed();
         logger.trace("{} - writing data {}.", path, data);
-        FileDescriptor.write(spiFileDescriptor, data);
-        var read = immediateRead ? FileDescriptor.read(spiFileDescriptor, 1) : new byte[]{};
+        FILE.write(spiFileDescriptor, data);
+        var read = immediateRead ? FILE.read(spiFileDescriptor, new byte[1], 1) : new byte[]{};
         if (immediateRead) {
             logger.trace("{} - immediate read data {}.", path, read);
         }
@@ -192,7 +197,7 @@ public final class SPIBus {
      */
     public void close() throws NativeMemoryException {
         logger.info("{} - closing SPIBus.", path);
-        FileDescriptor.close(spiFileDescriptor);
+        FILE.close(spiFileDescriptor);
         this.closed = true;
         logger.info("{} - SPIBus is closed. Recreate the SPIBus object to reuse.", path);
     }

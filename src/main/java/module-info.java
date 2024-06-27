@@ -3,6 +3,7 @@
  */
 module gpio.main {
     requires org.slf4j;
+    requires io.github.digitalsmile.annotation;
 
     exports org.digitalsmile.gpio;
     exports org.digitalsmile.gpio.pin;
@@ -14,4 +15,5 @@ module gpio.main {
     exports org.digitalsmile.gpio.i2c.attributes;
     exports org.digitalsmile.gpio.pwm;
     exports org.digitalsmile.gpio.pwm.attributes;
+    exports org.digitalsmile.gpio.scanner.model;
 }

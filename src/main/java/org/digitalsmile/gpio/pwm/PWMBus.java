@@ -1,8 +1,9 @@
 package org.digitalsmile.gpio.pwm;
 
+import io.github.digitalsmile.annotation.function.NativeMemoryException;
 import org.digitalsmile.gpio.GPIOBoard;
-import org.digitalsmile.gpio.NativeMemoryException;
 import org.digitalsmile.gpio.core.file.FileDescriptor;
+import org.digitalsmile.gpio.core.file.FileDescriptorNative;
 import org.digitalsmile.gpio.core.file.FileFlag;
 import org.digitalsmile.gpio.pwm.attributes.PWMPolarity;
 import org.slf4j.Logger;
@@ -18,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 public final class PWMBus {
     private static final Logger logger = LoggerFactory.getLogger(PWMBus.class);
     private static final StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
+    private static final FileDescriptor FILE = new FileDescriptorNative();
 
     private static final String CHIP_PATH = "/sys/class/pwm/pwmchip";
     private static final String CHIP_EXPORT_PATH = "/export";
@@ -64,38 +66,38 @@ public final class PWMBus {
         }
         var pwmFile = Path.of(pwmChipFile.getPath() + PWM_PATH + pwmBusNumber).toFile();
         if (!pwmFile.exists()) {
-            logger.warn("{} - no PWM Bus found... will try to export PWM Bus first.", pwmFile);
-            var npwmFd = FileDescriptor.open(pwmChipFile.getPath() + CHIP_NPWM_PATH, FileFlag.O_RDONLY);
-            var maxChannel = getIntegerContent(FileDescriptor.read(npwmFd, MAX_FILE_SIZE));
-            FileDescriptor.close(npwmFd);
+            logger.trace("{} - no PWM Bus found... will try to export PWM Bus first.", pwmFile);
+            var npwmFd = FILE.open(pwmChipFile.getPath() + CHIP_NPWM_PATH, FileFlag.O_RDONLY);
+            var maxChannel = getIntegerContent(FILE.read(npwmFd, new byte[MAX_FILE_SIZE], MAX_FILE_SIZE));
+            FILE.close(npwmFd);
             if (pwmBusNumber > maxChannel - 1) {
                 throw new IllegalArgumentException("PWM Bus at path '" + pwmFile.getPath() + "' cannot be exported! Max available channel is " + maxChannel);
             }
-            var exportFd = FileDescriptor.open(pwmChipFile.getPath() + CHIP_EXPORT_PATH, FileFlag.O_WRONLY);
-            FileDescriptor.write(exportFd, String.valueOf(pwmBusNumber));
-            FileDescriptor.close(exportFd);
+            var exportFd = FILE.open(pwmChipFile.getPath() + CHIP_EXPORT_PATH, FileFlag.O_WRONLY);
+            FILE.write(exportFd, String.valueOf(pwmBusNumber).getBytes());
+            FILE.close(exportFd);
             if (!pwmFile.exists()) {
                 throw new IllegalArgumentException("PWM Bus at path '" + pwmFile.getPath() + "' cannot be exported!");
             }
         }
         this.pwmPath = pwmFile.getPath();
 
-        var enableFd = FileDescriptor.open(this.pwmPath + ENABLE_PATH);
-        var dutyCycleFd = FileDescriptor.open(this.pwmPath + DUTY_CYCLE_PATH);
-        var periodFd = FileDescriptor.open(this.pwmPath + PERIOD_PATH);
-        var polarityFd = FileDescriptor.open(this.pwmPath + POLARITY_PATH);
+        var enableFd = FILE.open(this.pwmPath + ENABLE_PATH, FileFlag.O_RDWR);
+        var dutyCycleFd = FILE.open(this.pwmPath + DUTY_CYCLE_PATH, FileFlag.O_RDWR);
+        var periodFd = FILE.open(this.pwmPath + PERIOD_PATH, FileFlag.O_RDWR);
+        var polarityFd = FILE.open(this.pwmPath + POLARITY_PATH, FileFlag.O_RDWR);
 
-        this.enabled = getIntegerContent(FileDescriptor.read(enableFd, MAX_FILE_SIZE)) == 1;
-        this.dutyCycle = getIntegerContent(FileDescriptor.read(dutyCycleFd, MAX_FILE_SIZE));
-        this.period = getIntegerContent(FileDescriptor.read(periodFd, MAX_FILE_SIZE));
-        this.pwmPolarity = PWMPolarity.getPolarityByString(new String(FileDescriptor.read(polarityFd, MAX_FILE_SIZE)).trim());
+        this.enabled = getIntegerContent(FILE.read(enableFd, new byte[MAX_FILE_SIZE], MAX_FILE_SIZE)) == 1;
+        this.dutyCycle = getIntegerContent(FILE.read(dutyCycleFd, new byte[MAX_FILE_SIZE], MAX_FILE_SIZE));
+        this.period = getIntegerContent(FILE.read(periodFd, new byte[MAX_FILE_SIZE], MAX_FILE_SIZE));
+        this.pwmPolarity = PWMPolarity.getPolarityByString(new String(FILE.read(polarityFd, new byte[MAX_FILE_SIZE], MAX_FILE_SIZE)).trim());
 
-        FileDescriptor.close(enableFd);
-        FileDescriptor.close(dutyCycleFd);
-        FileDescriptor.close(periodFd);
-        FileDescriptor.close(polarityFd);
+        FILE.close(enableFd);
+        FILE.close(dutyCycleFd);
+        FILE.close(periodFd);
+        FILE.close(polarityFd);
 
-        logger.info("{} - pwm setup finished. Initial state: {}", pwmPath, this);
+        logger.debug("{} - pwm setup finished. Initial state: {}", pwmPath, this);
     }
 
     /**
@@ -106,7 +108,7 @@ public final class PWMBus {
      * @throws NativeMemoryException if any error occurred during configuration
      */
     public void configure(int frequency, int speed) throws NativeMemoryException {
-        logger.info("{} - setting frequency to {}Hz, speed to {}%.", pwmPath, frequency, speed);
+        logger.debug("{} - setting frequency to {}Hz, speed to {}%.", pwmPath, frequency, speed);
         configureInternal(frequency, speed);
     }
 
@@ -119,7 +121,7 @@ public final class PWMBus {
      * @throws NativeMemoryException if any error occurred during configuration
      */
     public void configure(int frequency, int speed, PWMPolarity pwmPolarity) throws NativeMemoryException {
-        logger.info("{} - setting frequency to {}Hz, speed to {}% and polarity to {}.", pwmPath, frequency, speed, pwmPolarity);
+        logger.debug("{} - setting frequency to {}Hz, speed to {}% and polarity to {}.", pwmPath, frequency, speed, pwmPolarity);
         configureInternal(frequency, speed);
         setPolarity(pwmPolarity);
     }
@@ -149,14 +151,14 @@ public final class PWMBus {
         var dutyCycle = (int) ((((NANOS_IN_SECOND / frequency) * speed) / 100f));
         logger.debug("{} - period is '{}' and dutyCycle is '{}'.", pwmPath, period, dutyCycle);
 
-        var periodFd = FileDescriptor.open(this.pwmPath + PERIOD_PATH, FileFlag.O_WRONLY);
-        var dutyCycleFd = FileDescriptor.open(this.pwmPath + DUTY_CYCLE_PATH, FileFlag.O_WRONLY);
+        var periodFd = FILE.open(this.pwmPath + PERIOD_PATH, FileFlag.O_WRONLY);
+        var dutyCycleFd = FILE.open(this.pwmPath + DUTY_CYCLE_PATH, FileFlag.O_WRONLY);
 
-        FileDescriptor.write(periodFd, String.valueOf(period).getBytes());
-        FileDescriptor.write(dutyCycleFd, String.valueOf(dutyCycle).getBytes());
+        FILE.write(periodFd, String.valueOf(period).getBytes());
+        FILE.write(dutyCycleFd, String.valueOf(dutyCycle).getBytes());
 
-        FileDescriptor.close(dutyCycleFd);
-        FileDescriptor.close(periodFd);
+        FILE.close(dutyCycleFd);
+        FILE.close(periodFd);
 
         this.period = period;
         this.dutyCycle = dutyCycle;
@@ -173,9 +175,9 @@ public final class PWMBus {
             return;
         }
         checkPeriodNotZero();
-        var enableFd = FileDescriptor.open(this.pwmPath + ENABLE_PATH);
-        FileDescriptor.write(enableFd, String.valueOf(1).getBytes());
-        FileDescriptor.close(enableFd);
+        var enableFd = FILE.open(this.pwmPath + ENABLE_PATH, FileFlag.O_RDWR);
+        FILE.write(enableFd, String.valueOf(1).getBytes());
+        FILE.close(enableFd);
         this.enabled = true;
     }
 
@@ -189,9 +191,9 @@ public final class PWMBus {
             logger.warn("{} - PWM Bus is already disabled.", pwmPath);
             return;
         }
-        var enableFd = FileDescriptor.open(this.pwmPath + ENABLE_PATH);
-        FileDescriptor.write(enableFd, String.valueOf(0).getBytes());
-        FileDescriptor.close(enableFd);
+        var enableFd = FILE.open(this.pwmPath + ENABLE_PATH, FileFlag.O_RDWR);
+        FILE.write(enableFd, String.valueOf(0).getBytes());
+        FILE.close(enableFd);
         this.enabled = false;
     }
 
@@ -211,10 +213,10 @@ public final class PWMBus {
                     "You should run disable() and then enable() to take effect!", pwmPath);
         }
         checkPeriodNotZero();
-        logger.info("{} - changing polarity to {}", pwmPath, pwmPolarity);
-        var polarityFd = FileDescriptor.open(this.pwmPath + POLARITY_PATH, FileFlag.O_WRONLY);
-        FileDescriptor.write(polarityFd, pwmPolarity.getPolarity().getBytes());
-        FileDescriptor.close(polarityFd);
+        logger.debug("{} - changing polarity to {}", pwmPath, pwmPolarity);
+        var polarityFd = FILE.open(this.pwmPath + POLARITY_PATH, FileFlag.O_WRONLY);
+        FILE.write(polarityFd, pwmPolarity.getPolarity().getBytes());
+        FILE.close(polarityFd);
         this.pwmPolarity = pwmPolarity;
     }
 
@@ -226,7 +228,7 @@ public final class PWMBus {
      */
     public void setSpeed(int speed) throws NativeMemoryException {
         checkPeriodNotZero();
-        logger.info("{} - setting speed to {}%.", pwmPath, speed);
+        logger.debug("{} - setting speed to {}%.", pwmPath, speed);
         configureInternal(frequency, speed);
     }
 
@@ -237,7 +239,7 @@ public final class PWMBus {
      * @throws NativeMemoryException if any error occurred
      */
     public void setFrequency(int frequency) throws NativeMemoryException {
-        logger.info("{} - setting frequency to {}Hz.", pwmPath, frequency);
+        logger.debug("{} - setting frequency to {}Hz.", pwmPath, frequency);
         configureInternal(frequency, speed);
     }
 
@@ -275,6 +277,10 @@ public final class PWMBus {
      */
     public int getFrequency() {
         return frequency;
+    }
+
+    public String getPwmPath() {
+        return pwmPath;
     }
 
     /**

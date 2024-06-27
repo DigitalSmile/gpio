@@ -1,11 +1,13 @@
 package org.digitalsmile.gpio.i2c.structs;
 
-import org.digitalsmile.gpio.core.NativeMemoryLayout;
+
+import io.github.digitalsmile.annotation.structure.NativeMemoryLayout;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 
 /**
@@ -31,6 +33,10 @@ public record SMBusIoctlData(byte readWrite, byte command, int size, SMBusData d
 
     private static final Arena offHeap = Arena.ofAuto();
 
+    public static SMBusIoctlData createEmpty() {
+        return new SMBusIoctlData((byte) 0, (byte) 0, 0, null);
+    }
+
     @Override
     public MemoryLayout getMemoryLayout() {
         return LAYOUT;
@@ -55,6 +61,11 @@ public record SMBusIoctlData(byte readWrite, byte command, int size, SMBusData d
         var smbusOffHeap = offHeap.allocate(SMBusData.LAYOUT);
         data.toBytes(smbusOffHeap);
         MH_DATA.set(buffer, 0L, smbusOffHeap);
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return false;
     }
 
     @Override
