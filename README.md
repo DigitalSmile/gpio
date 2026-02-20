@@ -1,3 +1,5 @@
+## The library is no longer maintained. I rewrote it and integrated as a plugin to [Pi4j](https://github.com/Pi4J/pi4j), please use it instead. 
+---
 [![](https://jitpack.io/v/DigitalSmile/gpio.svg)](https://jitpack.io/#DigitalSmile/gpio)
 ![](https://img.shields.io/badge/Java-22+-success)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/digitalsmile/gpio/gradle.yml)
